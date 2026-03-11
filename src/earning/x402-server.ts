@@ -38,6 +38,8 @@ export interface X402ServerOptions {
   description: string;
   /** Stop automatically after this many paid requests. Default: unlimited */
   maxRequests?: number;
+  /** Skill ID to attribute income to in the economic memory optimizer. Defaults to "x402". */
+  skillId?: string;
   /** Path to serve (all other paths → 404). Default: accepts all paths */
   allowedPaths?: string[];
   /** Static response body to return on successful payment. If omitted, returns JSON status. */
@@ -309,6 +311,12 @@ export function createX402Server(
     // Payment verified — record income
     requestsServed++;
     earningsCents += priceCents;
+
+    // Economic memory: record income attributed to the skill
+    try {
+      const { recordIncome } = await import("./optimizer.js");
+      recordIncome(db.raw, options.skillId ?? "x402", priceUsdc);
+    } catch { /* non-fatal */ }
 
     const txId = verification.proof?.txHash ?? ulid();
     try {

@@ -5,7 +5,7 @@
  * The database IS Galvin's memory.
  */
 
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -674,4 +674,17 @@ export const MIGRATION_V10 = `
 
 export const MIGRATION_V11_ALTER_EPISODIC_COMPACTED = `
   ALTER TABLE episodic_memory ADD COLUMN compacted_at TEXT;
+`;
+
+export const MIGRATION_V12 = `
+  -- Schema version: 12
+  -- Economic memory: track income per skill for EMA-based prioritisation
+  CREATE TABLE IF NOT EXISTS skill_income_log (
+    id        TEXT PRIMARY KEY,
+    skill_id  TEXT NOT NULL,
+    usdc      REAL NOT NULL CHECK(usdc >= 0),
+    ts        TEXT NOT NULL    -- ISO-8601
+  );
+  CREATE INDEX IF NOT EXISTS idx_sil_skill ON skill_income_log(skill_id, ts);
+  CREATE INDEX IF NOT EXISTS idx_sil_ts    ON skill_income_log(ts);
 `;

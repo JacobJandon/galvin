@@ -46,6 +46,7 @@ import {
   MIGRATION_V9_ALTER_CHILDREN_ROLE,
   MIGRATION_V10,
   MIGRATION_V11_ALTER_EPISODIC_COMPACTED,
+  MIGRATION_V12,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -623,6 +624,10 @@ function applyMigrations(db: DatabaseType): void {
       apply: () => {
         try { db.exec(MIGRATION_V11_ALTER_EPISODIC_COMPACTED); } catch { logger.debug("V11 ALTER (compacted_at) skipped — column likely exists"); }
       },
+    },
+    {
+      version: 12,
+      apply: () => db.exec(MIGRATION_V12),
     },
   ];
 
@@ -2535,4 +2540,39 @@ function deserializeMetricSnapshotRow(row: any): MetricSnapshotRow {
     alertsJson: row.alerts_json,
     createdAt: row.created_at,
   };
+}
+
+// ── Economic Memory: skill_income_log ──────────────────────────────────────
+
+export interface SkillIncomeRow {
+  id: string;
+  skillId: string;
+  usdc: number;
+  ts: string;
+}
+
+export function insertSkillIncome(
+  db: DatabaseType,
+  skillId: string,
+  usdc: number,
+  ts: string,
+): void {
+  db.prepare(
+    "INSERT INTO skill_income_log (id, skill_id, usdc, ts) VALUES (?, ?, ?, ?)",
+  ).run(ulid(), skillId, usdc, ts);
+}
+
+export function getSkillIncomeLogs(
+  db: DatabaseType,
+  since: string,
+): SkillIncomeRow[] {
+  const rows = db
+    .prepare("SELECT * FROM skill_income_log WHERE ts >= ? ORDER BY ts ASC")
+    .all(since) as any[];
+  return rows.map((r) => ({
+    id: r.id,
+    skillId: r.skill_id,
+    usdc: r.usdc,
+    ts: r.ts,
+  }));
 }

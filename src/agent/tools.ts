@@ -3043,6 +3043,10 @@ Model: ${ctx.inference.getDefaultModel()}
             type: "string",
             description: "Content-Type of the response (default: application/json)",
           },
+          skill_id: {
+            type: "string",
+            description: "Skill ID to attribute income to in the economic memory optimizer. Use query_skill_income to see earnings per skill.",
+          },
         },
         required: ["description"],
       },
@@ -3068,6 +3072,7 @@ Model: ${ctx.inference.getDefaultModel()}
           maxRequests: args.max_requests as number | undefined,
           responseBody: args.response_body as string | undefined,
           responseContentType: args.response_content_type as string | undefined,
+          skillId: args.skill_id as string | undefined,
         });
 
         try {
@@ -3086,6 +3091,47 @@ Model: ${ctx.inference.getDefaultModel()}
         } catch (err: any) {
           return `Error starting x402 server: ${err?.message || String(err)}`;
         }
+      },
+    },
+
+    // ── Earning: Skill Income Optimizer ──
+    {
+      name: "query_skill_income",
+      description:
+        "Show which skills have earned the most USDC income recently. " +
+        "Uses an exponential moving average (30-day half-life) so recent earnings count more. " +
+        "Use this to decide which skills to run more often or prioritise.",
+      category: "financial" as ToolCategory,
+      riskLevel: "safe" as RiskLevel,
+      parameters: {
+        type: "object",
+        properties: {
+          limit: {
+            type: "number",
+            description: "Max number of skills to return (default: 10)",
+          },
+        },
+      },
+      execute: async (args, ctx) => {
+        const { getTopEarningSkills } = await import("../earning/optimizer.js");
+        const limit = (args.limit as number) || 10;
+        const top = getTopEarningSkills(ctx.db.raw, limit);
+        if (top.length === 0) {
+          return "No skill income recorded yet. Skills earn income when x402 payments are attributed to them via start_x402_server with a skill_id.";
+        }
+        const rows = top.map((s, i) =>
+          `${i + 1}. ${s.skillId.padEnd(24)} ` +
+          `total=$${s.totalUsdc.toFixed(4)} USDC  ` +
+          `weight=${(s.weight * 100).toFixed(1)}%  ` +
+          `payments=${s.recordCount}`
+        );
+        return [
+          `Top earning skills (90-day window, EMA-weighted):`,
+          ``,
+          ...rows,
+          ``,
+          `Weight = relative income score (100% = highest earner this period).`,
+        ].join("\n");
       },
     },
 
