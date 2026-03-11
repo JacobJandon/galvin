@@ -128,6 +128,52 @@ export async function pruneDeadChildren(
   return removed;
 }
 
+export interface LineageNode {
+  id: string;
+  name: string;
+  address: string;
+  status: string;
+  createdAt: string;
+  inheritedMemoryHash?: string;
+}
+
+/**
+ * Return the full family tree as a flat list of LineageNode objects.
+ * Includes the inherited memory hash written by the parent at spawn time.
+ */
+export function getFamily(db: GalvinDatabase): LineageNode[] {
+  const children = db.getChildren();
+  return children.map((c) => {
+    const memHash = (db as any).raw
+      .prepare(`SELECT value FROM kv_store WHERE key = ?`)
+      .get(`memory_snapshot_hash:${c.id}`) as { value: string } | undefined;
+
+    return {
+      id:                  c.id,
+      name:                c.name,
+      address:             c.address.toString(),
+      status:              c.status,
+      createdAt:           c.createdAt,
+      inheritedMemoryHash: memHash?.value,
+    };
+  });
+}
+
+/**
+ * Store the inherited memory hash for a just-spawned child.
+ */
+export function setMemorySnapshotHash(
+  db: GalvinDatabase,
+  childId: string,
+  hash: string,
+): void {
+  try {
+    (db as any).raw
+      .prepare(`INSERT OR REPLACE INTO kv_store (key, value) VALUES (?, ?)`)
+      .run(`memory_snapshot_hash:${childId}`, hash);
+  } catch { /* non-fatal */ }
+}
+
 /**
  * Refresh status of all children using health monitor.
  * Concurrency limited to 3 simultaneous checks.

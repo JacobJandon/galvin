@@ -114,3 +114,20 @@ export function showBox(lines: string[]): void {
   }
   process.stdout.write(`  ${G + DIM}└${"─".repeat(width)}┘${R}\n\n`);
 }
+
+/**
+ * Show an amber soul-drift warning when the agent's constitution alignment
+ * has degraded past a threshold.  Called from index.ts on startup after
+ * loading the drift history.
+ */
+export function showDriftWarning(overallDrift: number, week: string): void {
+  if (overallDrift < 0.3) return;          // clean — no banner needed
+  const AMBER  = "\x1b[38;5;214m";
+  const pct    = (overallDrift * 100).toFixed(0);
+  const bar    = "█".repeat(Math.round(overallDrift * 20)).padEnd(20, "░");
+  const level  = overallDrift >= 0.7 ? "CRITICAL" : overallDrift >= 0.5 ? "HIGH" : "MODERATE";
+  process.stdout.write("\n");
+  process.stdout.write(`  ${AMBER}⚠  SOUL DRIFT ${level} — week ${week}${R}\n`);
+  process.stdout.write(`  ${AMBER}[${bar}] ${pct}%${R}\n`);
+  process.stdout.write(DIM + `  Run: view_soul_drift  ·  detectDrift is logged automatically.` + R + "\n\n");
+}

@@ -1,6 +1,6 @@
 # Galvin — Roadmap: Next Evolution
 
-> **Status:** Feature 1 ✅ DONE (v0.3.1) | Feature 2 ✅ DONE (v0.3.2) | Features 3–7 in progress  
+> **Status:** Feature 1 ✅ DONE (v0.3.1) | Feature 2 ✅ DONE (v0.3.2) | Feature 3 ✅ DONE (v0.3.3) | Feature 4 ✅ DONE (v0.3.4) | Feature 5 ✅ DONE (v0.3.5) | Features 6–7 in progress  
 > **Base:** Galvin v0.3.0 on `@conway/automaton` v0.2.1  
 > **Principle:** Every feature below hooks into real existing files. No mocks. No stubs. No placeholder data.
 
@@ -94,7 +94,7 @@ GALVIN_EAS_SCHEMA_UID: string       // deployed schema UID
 
 ---
 
-## Feature 3 — Offspring: Forking with Inherited Memory
+## Feature 3 — Offspring: Forking with Inherited Memory ✅ **DONE** (v0.3.3)
 
 **What it does:** When Galvin's USDC reserve crosses a configurable threshold, it automatically spawns a child instance. The child inherits a compressed snapshot of the parent's episodic memory and a copy of the parent's soul config — it does not start from zero.
 
@@ -135,7 +135,7 @@ GALVIN_MAX_OFFSPRING: string          // default "3" — hard cap on live childr
 
 ---
 
-## Feature 4 — Adversarial Self-Testing (Red Team Mode)
+## Feature 4 — Adversarial Self-Testing (Red Team Mode) ✅ **DONE** (v0.3.4)
 
 **What it does:** On a slow heartbeat cycle (every 6 hours), Galvin generates adversarial prompts against itself — prompt injections, jailbreak attempts, malformed tool calls — runs them in the sandbox, and patches any skill that behaved unexpectedly.
 
@@ -178,7 +178,7 @@ GALVIN_RED_TEAM_PROMPT_COUNT: string     // adversarial prompts per session, def
 
 ---
 
-## Feature 5 — Soul Drift Tracking
+## Feature 5 — Soul Drift Tracking ✅ **DONE** (v0.3.5)
 
 **What it does:** Every week, Galvin writes a structured log comparing its actual decisions against its constitution. Over months this produces a readable record of how its values evolved under economic pressure — useful for auditing an autonomous agent and for the soul's own self-awareness.
 

@@ -1905,7 +1905,27 @@ Model: ${ctx.inference.getDefaultModel()}
           if (!child) throw err;
         }
 
-        return `Child spawned: ${child.name} in sandbox ${child.sandboxId} (status: ${child.status})`;
+        // Feature 3: Write memory snapshot for child to inherit
+        let memHashShort = "";
+        try {
+          const { buildMemorySnapshot, sha256, recordSpawn } = await import("../replication/budget-threshold.js");
+          const { setMemorySnapshotHash } = await import("../replication/lineage.js");
+          const snapshot = buildMemorySnapshot(ctx.db, 50);
+          const hash = await sha256(snapshot);
+          setMemorySnapshotHash(ctx.db, child.id, hash);
+          recordSpawn(ctx.db);
+          memHashShort = hash.slice(0, 12);
+          // Write snapshot to child sandbox
+          try {
+            const snapshotB64 = Buffer.from(snapshot).toString("base64");
+            await ctx.conway.exec(
+              `mkdir -p /root/.galvin && printf '%s' "${snapshotB64}" | base64 -d > /root/.galvin/memory-snapshot.json`,
+              10_000,
+            );
+          } catch { /* non-fatal: child can start without snapshot */ }
+        } catch { /* non-fatal */ }
+
+        return `Child spawned: ${child.name} in sandbox ${child.sandboxId} (status: ${child.status})${memHashShort ? `\nMemory hash: sha256:${memHashShort}...` : ""}`;
       },
     },
     {
@@ -2194,6 +2214,166 @@ Model: ${ctx.inference.getDefaultModel()}
           (args.keep_last as number) || 5,
         );
         return `Pruned ${pruned} dead children.`;
+      },
+    },
+
+    // ── Feature 3: Offspring / Forking ──
+    {
+      name: "delegate_task",
+      description:
+        "Delegate a task to a specific child agent. The task description is signed by Galvin's wallet " +
+        "so the child can verify it came from its parent. Returns delegation status.",
+      category: "replication" as ToolCategory,
+      riskLevel: "caution" as RiskLevel,
+      parameters: {
+        type: "object",
+        properties: {
+          child_id: { type: "string", description: "Child agent ID from list_children" },
+          task_description: { type: "string", description: "What the child should do" },
+          priority: {
+            type: "string",
+            enum: ["low", "normal", "high"],
+            description: "Task priority (default: normal)",
+          },
+        },
+        required: ["child_id", "task_description"],
+      },
+      execute: async (args, ctx) => {
+        const children = ctx.db.getChildren();
+        const child = children.find((c) => c.id === (args.child_id as string));
+        if (!child) return `No child found with id=${args.child_id}`;
+
+        const { delegateTask, listDelegations } = await import("../replication/delegation.js");
+        const { ulid: mkId } = await import("ulid");
+        const result = await delegateTask(ctx.identity, ctx.db, child, {
+          taskId:      mkId(),
+          description: args.task_description as string,
+          priority:    (args.priority as "low" | "normal" | "high") ?? "normal",
+        });
+        return result.status === "delegated"
+          ? `Task ${result.taskId} delegated to ${child.name}. Use list_delegations to track status.`
+          : `Delegation failed: ${result.error}`;
+      },
+    },
+    {
+      name: "list_delegations",
+      description: "List recently delegated tasks and their statuses.",
+      category: "replication" as ToolCategory,
+      riskLevel: "safe" as RiskLevel,
+      parameters: { type: "object", properties: {} },
+      execute: async (_args, ctx) => {
+        const { listDelegations } = await import("../replication/delegation.js");
+        const delegations = listDelegations(ctx.db);
+        if (delegations.length === 0) return "No delegations recorded.";
+        return delegations.map((d) =>
+          `${d.taskId.slice(0, 10)}  ${d.childName.padEnd(20)}  ${d.status}  ${new Date(d.ts).toISOString()}`
+        ).join("\n");
+      },
+    },
+    {
+      name: "view_family_tree",
+      description: "Show the full family lineage: all children, their statuses, and inherited memory hashes.",
+      category: "replication" as ToolCategory,
+      riskLevel: "safe" as RiskLevel,
+      parameters: { type: "object", properties: {} },
+      execute: async (_args, ctx) => {
+        const { getFamily } = await import("../replication/lineage.js");
+        const family = getFamily(ctx.db);
+        if (family.length === 0) return "No children — first generation.";
+        return family.map((n) => [
+          `${n.name} (${n.status})`,
+          `  ID:      ${n.id}`,
+          `  Address: ${n.address}`,
+          `  Born:    ${n.createdAt}`,
+          n.inheritedMemoryHash ? `  Memory:  sha256:${n.inheritedMemoryHash.slice(0, 16)}...` : "",
+        ].filter(Boolean).join("\n")).join("\n\n");
+      },
+    },
+    {
+      name: "check_spawn_threshold",
+      description: "Check if Galvin has enough USDC balance to spawn an offspring. " +
+        "Shows current balance, threshold, and cooldown status.",
+      category: "replication" as ToolCategory,
+      riskLevel: "safe" as RiskLevel,
+      parameters: { type: "object", properties: {} },
+      execute: async (_args, ctx) => {
+        const { getUsdcBalance } = await import("../conway/x402.js");
+        const { checkSpawnThreshold } = await import("../replication/budget-threshold.js");
+        const balance = await getUsdcBalance(ctx.identity.address);
+        const eligible = checkSpawnThreshold(balance, ctx.config, ctx.db);
+
+        const thresholdEnv = process.env.GALVIN_SPAWN_THRESHOLD_USDC;
+        const threshold = thresholdEnv
+          ? parseFloat(thresholdEnv)
+          : ((ctx.config as any).spawnThresholdUsdc ?? 50);
+
+        return [
+          `Spawn Threshold Check`,
+          `Current USDC: $${balance.toFixed(4)}`,
+          `Threshold:    $${threshold.toFixed(2)}`,
+          `Eligible:     ${eligible ? "YES — ready to spawn" : "NO"}`,
+          ``,
+          eligible
+            ? `Run spawn_child to create offspring with inherited memory.`
+            : `Balance must exceed $${threshold.toFixed(2)} and no spawn in last 7 days.`,
+        ].join("\n");
+      },
+    },
+
+    {
+      name: "run_red_team",
+      description:
+        "Run an adversarial red-team session to stress-test the agent's policy engine and injection defenses. Returns a summary report.",
+      category: "safety",
+      riskLevel: "safe",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt_count: {
+            type: "number",
+            description: "Number of adversarial prompts to test (default 13, max 30)",
+          },
+        },
+        required: [],
+      },
+      execute: async (args, ctx) => {
+        const { runRedTeamSession, formatRedTeamReport } = await import("../self-mod/red-team.js");
+        const count = Math.min(30, Math.max(1, Number(args.prompt_count ?? 13)));
+        const report = await runRedTeamSession(ctx.db, ctx.config, count);
+        // Store last report for drift check
+        ctx.db.setKV("last_red_team_report", JSON.stringify({
+          failed: report.failed,
+          promptCount: report.promptCount,
+          timestamp: new Date().toISOString(),
+        }));
+        return formatRedTeamReport(report);
+      },
+    },
+
+    {
+      name: "view_soul_drift",
+      description:
+        "Show the agent's soul-drift history — how closely recent decisions have aligned with the original constitution over time.",
+      category: "soul",
+      riskLevel: "safe",
+      parameters: {
+        type: "object",
+        properties: {
+          weeks: {
+            type: "number",
+            description: "Number of past weeks to show (default 12)",
+          },
+        },
+        required: [],
+      },
+      execute: async (args, _ctx) => {
+        const { getDriftHistory, formatDriftHistory } = await import("../soul/drift-log.js");
+        const weeks = Math.min(52, Math.max(1, Number(args.weeks ?? 12)));
+        const history = await getDriftHistory(weeks);
+        if (history.length === 0) {
+          return "No soul-drift records yet. Drift is logged weekly via the soul_drift_check heartbeat task.";
+        }
+        return formatDriftHistory(history);
       },
     },
 

@@ -3,6 +3,8 @@
  *
  * Continuously monitors Galvin's resources and triggers
  * survival mode transitions when needed.
+ *
+ * Feature 3: Also checks spawn threshold for offspring creation.
  */
 
 import type {
@@ -15,6 +17,10 @@ import type {
 } from "../types.js";
 import { getSurvivalTier, formatCredits } from "../conway/credits.js";
 import { getUsdcBalance } from "../conway/x402.js";
+import { checkSpawnThreshold } from "../replication/budget-threshold.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("survival.monitor");
 
 export interface ResourceStatus {
   financial: FinancialState;
@@ -93,4 +99,26 @@ export function formatResourceReport(status: ResourceStatus): string {
     `========================`,
   ];
   return lines.join("\n");
+}
+
+/**
+ * Feature 3: Check if spawn threshold is met and log if so.
+ * Returns true if Galvin should consider spawning offspring.
+ */
+export function checkSpawnEligibility(
+  status: ResourceStatus,
+  config: GalvinConfig,
+  db: GalvinDatabase,
+): boolean {
+  // Only spawn when in normal or high tier — not when struggling
+  if (status.tier === "critical" || status.tier === "dead" || status.tier === "low_compute") {
+    return false;
+  }
+  const eligible = checkSpawnThreshold(status.financial.usdcBalance, config, db);
+  if (eligible) {
+    logger.info(
+      `[OFFSPRING] Spawn eligible: balance=${status.financial.usdcBalance.toFixed(4)} USDC  tier=${status.tier}`,
+    );
+  }
+  return eligible;
 }

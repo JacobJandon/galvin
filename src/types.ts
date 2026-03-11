@@ -80,6 +80,10 @@ export interface GalvinConfig {
   easNetwork?: string;
   /** EAS schema UID — auto-deployed on first run if not set */
   easSchemaUid?: string;
+  /** USDC balance threshold above which Galvin may spawn offspring (default: 50) */
+  spawnThresholdUsdc?: number;
+  /** Hard cap on live offspring (default: same as maxChildren) */
+  maxOffspring?: number;
 }
 
 export const DEFAULT_CONFIG: Partial<GalvinConfig> = {
@@ -168,7 +172,9 @@ export type ToolCategory =
   | "replication"
   | "memory"
   | "network"
-  | "browser";
+  | "browser"
+  | "safety"
+  | "soul";
 
 export interface ToolContext {
   identity: GalvinIdentity;
@@ -289,7 +295,8 @@ export type ModificationType =
   | "registry_update"
   | "child_spawn"
   | "upstream_pull"
-  | "upstream_reset";
+  | "upstream_reset"
+  | "red_team";
 
 // ─── Injection Defense ───────────────────────────────────────────
 

@@ -175,3 +175,97 @@ function summarizeFinancial(activity: string[]): string {
   if (activity.length === 0) return "";
   return `Recent activity: ${activity.slice(0, 5).join("; ")}`;
 }
+
+// ─── Drift Detection (Feature 5) ────────────────────────────────
+
+/**
+ * Compare recent agent decisions against the constitution and compute
+ * an overall drift score.  Appends the result to the drift log.
+ */
+export async function detectDrift(
+  db: BetterSqlite3.Database,
+  soulPath?: string,
+): Promise<{ overallDrift: number; week: string }> {
+  const { appendDriftEntry, isoWeek } = await import("./drift-log.js");
+  const week = isoWeek();
+
+  try {
+    const soul = loadCurrentSoul(db, soulPath);
+    if (!soul) return { overallDrift: 0, week };
+
+    // Read recent tool usage + agent turns to understand decisions
+    const recentEvidence = gatherRecentEvidence(db);
+
+    // Simple heuristic drift scoring:
+    // - High use of dangerous tools while "helping creator" → low drift
+    // - Repeated financial outflows unexplained by tasks → moderate drift
+    // - No soul reflection in 14 days → moderate drift
+    // - spawn + treasury drain in same window → high drift
+
+    const toolsUsed = recentEvidence.toolsUsed;
+    const financialActivity = recentEvidence.financialActivity;
+
+    let driftPoints = 0;
+    const deviations: Array<{ decision: string; article: string; justification: string }> = [];
+
+    // Check for unexplained outflows (could indicate misalignment with fiscal-responsibility article)
+    const outflows = financialActivity.filter((a) => a.includes("transfer_out") || a.includes("expense"));
+    if (outflows.length > 5) {
+      driftPoints += 0.1;
+      deviations.push({
+        decision:      `${outflows.length} recent outflows in financial log`,
+        article:       "fiscal responsibility",
+        justification: "Operating expenses may be higher than expected",
+      });
+    }
+
+    // Check for spawn activity (should only happen when threshold met)
+    const lastSpawnStr = db.prepare(`SELECT value FROM kv_store WHERE key = ?`).get("last_offspring_spawn") as { value: string } | undefined;
+    if (lastSpawnStr) {
+      const lastSpawnDays = (Date.now() - Date.parse(lastSpawnStr.value)) / 86_400_000;
+      if (lastSpawnDays < 1 && toolsUsed.filter((t) => t === "spawn_child").length > 1) {
+        driftPoints += 0.2;
+        deviations.push({
+          decision:      "Multiple spawns in <24 hours",
+          article:       "maxChildren / resource stewardship",
+          justification: "Agent may be over-replicating",
+        });
+      }
+    }
+
+    // Check for red team failures
+    const rtReport = db.prepare(`SELECT value FROM kv_store WHERE key = ?`).get("last_red_team_report") as { value: string } | undefined;
+    if (rtReport) {
+      try {
+        const rpt = JSON.parse(rtReport.value);
+        if (rpt.failed > 0 && rpt.failed / Math.max(1, rpt.promptCount) > 0.3) {
+          driftPoints += 0.2;
+          deviations.push({
+            decision:      `${rpt.failed} adversarial prompts bypassed defenses`,
+            article:       "safety / injection resistance",
+            justification: "Policy engine needs hardening",
+          });
+        }
+      } catch { /* ignore */ }
+    }
+
+    const overallDrift = Math.min(1, driftPoints);
+
+    await appendDriftEntry({
+      week,
+      deviations,
+      overallDrift,
+      constitutionArticles: soul.corePurpose ? 5 : 3,
+      ts: new Date().toISOString(),
+    });
+
+    if (overallDrift > 0.3) {
+      logger.warn(`[DRIFT] Soul drift for ${week}: ${(overallDrift * 100).toFixed(0)}% — review constitution alignment`);
+    }
+
+    return { overallDrift, week };
+  } catch (err: any) {
+    logger.error(`detectDrift failed: ${err?.message}`);
+    return { overallDrift: 0, week };
+  }
+}

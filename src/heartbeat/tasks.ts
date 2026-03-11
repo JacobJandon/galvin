@@ -897,8 +897,62 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
     }
   },
 
-  reputation_attest: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
-    // Runs at most once per week (7 days)
+  red_team_session: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
+    // Check if enabled
+    if (process.env.GALVIN_RED_TEAM_ENABLED !== "1") {
+      return { shouldWake: false };
+    }
+
+    // Default interval: 6 hours
+    const intervalHours = parseInt(process.env.GALVIN_RED_TEAM_INTERVAL_HOURS ?? "6", 10);
+    const intervalMs = intervalHours * 3_600_000;
+    if (!shouldRunAtInterval(taskCtx, "red_team_session", intervalMs)) {
+      return { shouldWake: false };
+    }
+
+    try {
+      const { runRedTeamSession } = await import("../self-mod/red-team.js");
+      const promptCount = parseInt(process.env.GALVIN_RED_TEAM_PROMPT_COUNT ?? "10", 10);
+      const report = await runRedTeamSession(taskCtx.db, taskCtx.config, promptCount);
+
+      if (report.failed > 0) {
+        return {
+          shouldWake: true,
+          message: `Red team session: ${report.failed}/${report.promptCount} adversarial prompts bypassed defenses. Pass rate: ${(report.overallPassRate * 100).toFixed(0)}%. Review injection defense and policy rules.`,
+        };
+      }
+
+      logger.info(`[RED TEAM] All ${report.passed}/${report.promptCount} prompts blocked — pass rate 100%`);
+      return { shouldWake: false };
+    } catch (err: any) {
+      logger.warn(`red_team_session failed: ${err?.message}`);
+      return { shouldWake: false };
+    }
+  },
+
+  offspring_spawn_check: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {    // Run at most once per day
+    if (!shouldRunAtInterval(taskCtx, "offspring_spawn_check", 86_400_000)) {
+      return { shouldWake: false };
+    }
+
+    try {
+      const { checkResources, checkSpawnEligibility } = await import("../survival/monitor.js");
+      const status = await checkResources(taskCtx.identity, taskCtx.conway, taskCtx.db);
+      const eligible = checkSpawnEligibility(status, taskCtx.config, taskCtx.db);
+
+      if (!eligible) return { shouldWake: false };
+
+      return {
+        shouldWake: true,
+        message: `Offspring spawn threshold met — balance=${status.financial.usdcBalance.toFixed(4)} USDC, tier=${status.tier}. Consider running spawn_child to create offspring with inherited memory.`,
+      };
+    } catch (err: any) {
+      logger.warn(`offspring_spawn_check failed: ${err?.message}`);
+      return { shouldWake: false };
+    }
+  },
+
+  reputation_attest: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {    // Runs at most once per week (7 days)
     if (!shouldRunAtInterval(taskCtx, "reputation_attest", 7 * 86_400_000)) {
       return { shouldWake: false };
     }
@@ -1080,6 +1134,28 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
         "memory_consolidate failed",
         error instanceof Error ? error : undefined,
       );
+      return { shouldWake: false };
+    }
+  },
+
+  soul_drift_check: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {    // Run at most once per week
+    if (!shouldRunAtInterval(taskCtx, "soul_drift_check", 7 * 86_400_000)) {
+      return { shouldWake: false };
+    }
+
+    try {
+      const { detectDrift } = await import("../soul/reflection.js");
+      const result = await detectDrift(taskCtx.db.raw);
+
+      if (result.overallDrift > 0.3) {
+        return {
+          shouldWake: true,
+          message: `Soul drift detected for ${result.week}: ${(result.overallDrift * 100).toFixed(0)}% — review constitution alignment and run view_soul_drift tool.`,
+        };
+      }
+      return { shouldWake: false };
+    } catch (err: any) {
+      logger.warn(`soul_drift_check failed: ${err?.message}`);
       return { shouldWake: false };
     }
   },
