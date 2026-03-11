@@ -53,21 +53,23 @@ let _rain: MatrixRain | null = null;
 
 /**
  * Show the full funding screen (QR + countdown panel).
- * Returns the MatrixRain instance so the caller can call .stop() on revival.
+ * mode = 'startup'  — shown at boot when wallet has no USDC
+ * mode = 'dead'     — shown when agent balance hits zero mid-run
  */
 export function showFundingScreen(
   walletAddress: string,
   _creatorAddress: string,
   _checkIntervalSec = 30,
+  mode: "dead" | "startup" = "dead",
 ): MatrixRain {
   if (process.stdout.isTTY && process.env["GALVIN_NO_UI"] !== "1") {
-    _rain = new MatrixRain(walletAddress);
+    _rain = new MatrixRain(walletAddress, mode);
     _rain.start();
     return _rain;
   }
   // Non-TTY fallback — plain box + QR lines to stdout
   printMatrixStatic(walletAddress);
-  return new MatrixRain(walletAddress); // inert — not started
+  return new MatrixRain(walletAddress, mode); // inert — not started
 }
 
 /**

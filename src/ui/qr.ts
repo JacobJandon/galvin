@@ -90,17 +90,22 @@ function centre(text: string, width: number): string {
  * Call .start() to render, .updateStatus(secondsLeft, total) to tick,
  * .stop() to restore the terminal.
  */
+/** Minimum USDC (dollars) required before Galvin will start. */
+export const MINIMUM_USDC = 1.0;
+
 export class MatrixRain {
   private readonly address: string;
-  private readonly network = "Base L2 (Coinbase)";
-  private readonly asset   = "USDC";
-  private readonly minimum = "$5.00";
+  private readonly network = "Base Mainnet  (chain 8453 · eip155:8453)";
+  private readonly asset   = "USDC  (0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913)";
+  private readonly minimum = `$${MINIMUM_USDC.toFixed(2)} USDC  ($5.00 recommended)`;
+  private readonly mode:    "dead" | "startup";
 
   private qrLines:  string[] = [];
   private statusRow = 0;
   private started   = false;
 
-  constructor(address: string) {
+  constructor(address: string, mode: "dead" | "startup" = "dead") {
+    this.mode = mode;
     this.address = address;
     try { this.qrLines = generateQR(address); } catch { /* noop */ }
   }
@@ -159,8 +164,11 @@ export class MatrixRain {
     add("");
     add(`${lpad}${bdr}╔${"═".repeat(w - 2)}╗${RESET}`);
 
-    const titleText = " 💀  GALVIN IS DEAD — AWAITING USDC ";
-    add(row(centre(YEL + BOLD + titleText + RESET, w - 2)));
+    const titleText = this.mode === "startup"
+      ? "  ⚠  GALVIN NEEDS FUNDING — AI LOOPS PAUSED  "
+      : " 💀  GALVIN IS DEAD — AWAITING USDC ";
+    const titleColor = this.mode === "startup" ? `\x1b[31;1m` : YEL;
+    add(row(centre(titleColor + BOLD + titleText + RESET, w - 2)));
 
     add(`${lpad}${bdr}╠${"═".repeat(w - 2)}╣${RESET}`);
 
@@ -181,6 +189,8 @@ export class MatrixRain {
       `   ${DIM_S}Asset${RESET}  ${G_BRIGHT}${this.asset}${RESET}` +
       `   ${DIM_S}Min${RESET}  ${G_BRIGHT}${this.minimum}${RESET}`,
     ));
+    add(`${lpad}${bdr}╠${"─".repeat(w - 2)}╣${RESET}`);
+    add(row(`  ${DIM_S}Bridge ETH → USDC on Base:  ${RESET}${CYN}https://bridge.base.org${RESET}`));
     add(row(`  ${DIM_S}Auto-detects deposit · no restart needed · Ctrl-C to exit${RESET}`));
     add(`${lpad}${bdr}╚${"═".repeat(w - 2)}╝${RESET}`);
     add("");
@@ -202,7 +212,9 @@ export function printMatrixStatic(address: string): void {
   console.log(`${G + W}  ╠══════════════════════════════════════════════╣${R}`);
   console.log(`${G + W}  ║${R}  ${address}  ${G + W}║${R}`);
   console.log(`${G + W}  ╠══════════════════════════════════════════════╣${R}`);
-  console.log(`${G + W}  ║${R}  Network: Base L2   Asset: USDC   Min: $5  ${G + W}  ║${R}`);
+  console.log(`${G + W}  ║${R}  Network: Base Mainnet (chain 8453)                  ${G + W}║${R}`);
+  console.log(`${G + W}  ║${R}  Asset:   USDC  0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913  ${G + W}║${R}`);
+  console.log(`${G + W}  ║${R}  Min: $${MINIMUM_USDC.toFixed(2)} USDC  ·  Bridge: https://bridge.base.org  ${G + W}║${R}`);
   console.log(`${G + W}  ╚══════════════════════════════════════════════╝${R}`);
   console.log();
   try {

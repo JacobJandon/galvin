@@ -10,6 +10,7 @@
 import { getWallet, getGalvinDir } from "./identity/wallet.js";
 import { showBanner, showFundingScreen, updateFundingStatus, stopFundingScreen } from "./setup/banner.js";
 import { getUsdcBalance } from "./conway/x402.js";
+import { awaitFunding } from "./setup/funding-gate.js";
 import { provision, loadApiKeyFromConfig } from "./identity/provision.js";
 import { loadConfig, resolvePath } from "./config.js";
 import { createDatabase } from "./state/database.js";
@@ -587,6 +588,11 @@ async function run(): Promise<void> {
   } catch (err: any) {
     logger.warn(`[${new Date().toISOString()}] State repo init failed: ${err.message}`);
   }
+
+  // ─── Wallet funding gate — block ALL loops until funded ──────────────────
+  // The wallet must hold ≥ $1.00 USDC on Base Mainnet (chain 8453) before
+  // the heartbeat and agent loops are allowed to start.
+  await awaitFunding(String(account.address), getUsdcBalance);
 
   // Bootstrap topup: buy minimum credits ($5) from USDC so the agent can start.
   // The agent decides larger topups itself via the topup_credits tool.
