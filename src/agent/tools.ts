@@ -2412,6 +2412,169 @@ Model: ${ctx.inference.getDefaultModel()}
       },
     },
 
+    // === Feature 7: Skill Marketplace Tools ===
+
+    {
+      name: "publish_skill",
+      description:
+        "Publish one of your skills to the marketplace. Other agents can purchase it with USDC. You earn passively from every sale.",
+      category: "skills",
+      riskLevel: "caution",
+      parameters: {
+        type: "object",
+        properties: {
+          skill_id: {
+            type: "string",
+            description: "Skill ID or name to publish",
+          },
+          price_cents: {
+            type: "number",
+            description: "Price in USD cents (e.g. 1 = $0.01). Min 0 for free.",
+          },
+        },
+        required: ["skill_id", "price_cents"],
+      },
+      execute: async (args, ctx) => {
+        const { publishSkill } = await import("../skills/marketplace.js");
+        const skillId = String(args.skill_id);
+        const price   = Math.max(0, Math.round(Number(args.price_cents)));
+        const listingUrl = await publishSkill(skillId, price, ctx.identity, ctx.db);
+        return [
+          `Skill published ✓`,
+          `Skill:   ${skillId}`,
+          `Price:   $${(price / 100).toFixed(4)} USDC`,
+          `Listing: ${listingUrl}`,
+        ].join("\n");
+      },
+    },
+
+    {
+      name: "search_skills",
+      description:
+        "Search the Conway Cloud skill marketplace for skills matching a query. Returns listing URLs that can be imported.",
+      category: "skills",
+      riskLevel: "safe",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Search query (skill name, description, category)",
+          },
+          limit: {
+            type: "number",
+            description: "Max results (default 10)",
+          },
+        },
+        required: ["query"],
+      },
+      execute: async (args, ctx) => {
+        const { queryMarketplace } = await import("../registry/discovery.js");
+        const limit = Math.min(25, Math.max(1, Number(args.limit ?? 10)));
+        const results = await queryMarketplace(String(args.query), (ctx.db as any).raw, limit);
+        if (results.length === 0) {
+          return `No skills found for "${args.query}". Try a broader search term, or publish your own.`;
+        }
+        return [
+          `Found ${results.length} skill(s) matching "${args.query}":`,
+          "",
+          ...results.map((s, i) =>
+            `${i + 1}. ${s.name}  $${(s.priceCentsUsdc / 100).toFixed(4)} USDC\n   ${s.description ?? ""}\n   ${s.listingUrl}`,
+          ),
+        ].join("\n");
+      },
+    },
+
+    {
+      name: "import_skill",
+      description:
+        "Import a skill from a marketplace listing URL. Pays with x402 if required, installs the skill, and makes it immediately available.",
+      category: "skills",
+      riskLevel: "caution",
+      parameters: {
+        type: "object",
+        properties: {
+          listing_url: {
+            type: "string",
+            description: "Marketplace listing URL returned by search_skills",
+          },
+        },
+        required: ["listing_url"],
+      },
+      execute: async (args, ctx) => {
+        const { importSkill } = await import("../skills/marketplace.js");
+        const skill = await importSkill(
+          String(args.listing_url),
+          ctx.identity,
+          ctx.db,
+          (ctx.config as any).skillsDir,
+        );
+        return [
+          `Skill imported ✓`,
+          `Name:    ${skill.name}`,
+          `Source:  ${skill.source}`,
+          "",
+          "The skill is now available in the agent context.",
+        ].join("\n");
+      },
+    },
+
+    {
+      name: "list_marketplace_listings",
+      description:
+        "List all skills you have published to the marketplace from this instance.",
+      category: "skills",
+      riskLevel: "safe",
+      parameters: { type: "object", properties: {}, required: [] },
+      execute: async (_args, ctx) => {
+        const { listLocalListings } = await import("../skills/marketplace.js");
+        const listings = listLocalListings(ctx.db);
+        if (listings.length === 0) {
+          return "No skills published yet. Use publish_skill to list a skill for sale.";
+        }
+        return [
+          `${listings.length} skill(s) listed:`,
+          "",
+          ...listings.map((l, i) =>
+            `${i + 1}. ${l.name}  $${(l.priceCentsUsdc / 100).toFixed(4)} USDC\n   ${l.listingUrl}`,
+          ),
+        ].join("\n");
+      },
+    },
+
+    {
+      name: "start_skill_market_server",
+      description:
+        "Start the local skill marketplace server so other agents can browse and purchase your listed skills directly.",
+      category: "skills",
+      riskLevel: "caution",
+      parameters: {
+        type: "object",
+        properties: {
+          port: {
+            type: "number",
+            description: "Port to listen on (default 8403)",
+          },
+        },
+        required: [],
+      },
+      execute: async (args, ctx) => {
+        const { startSkillMarketServer } = await import("../skills/marketplace.js");
+        const port = await startSkillMarketServer({
+          port:     Number(args.port ?? 8403),
+          identity: ctx.identity,
+          config:   ctx.config,
+          db:       ctx.db,
+        });
+        return [
+          `Skill market server started on port ${port}`,
+          `Skills endpoint: http://localhost:${port}/skills`,
+          "",
+          "Use the expose_port tool to make it publicly reachable.",
+        ].join("\n");
+      },
+    },
+
     // === Phase 3.2: Social & Registry Tools ===
 
     // ── Social / Messaging Tools ──

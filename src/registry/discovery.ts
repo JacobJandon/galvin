@@ -384,3 +384,57 @@ export async function searchAgents(
     )
     .slice(0, limit);
 }
+
+// ─── Skill Marketplace Discovery ──────────────────────────────────────────
+
+/**
+ * Search the Conway Cloud skill marketplace for listings matching a query.
+ * Falls back to returning locally published skills if the API is unreachable.
+ */
+export async function queryMarketplace(
+  query: string,
+  db?: import("better-sqlite3").Database,
+  limit = 10,
+): Promise<import("../skills/marketplace.js").SkillListing[]> {
+  const lower = query.toLowerCase();
+
+  // Try Conway Cloud first
+  try {
+    const res = await fetch(
+      `https://api.conway.cloud/v1/skills/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+      { signal: AbortSignal.timeout(8_000) },
+    );
+    if (res.ok) {
+      const data = await res.json() as { skills?: unknown[] };
+      if (Array.isArray(data.skills)) {
+        return data.skills as import("../skills/marketplace.js").SkillListing[];
+      }
+    }
+  } catch { /* API offline — fall through to local listings */ }
+
+  // Fall back to local DB listings
+  if (!db) return [];
+  try {
+    const rows = db
+      .prepare(
+        `SELECT * FROM marketplace_listings
+         WHERE lower(name) LIKE ? OR lower(description) LIKE ?
+         ORDER BY published_at DESC LIMIT ?`,
+      )
+      .all(`%${lower}%`, `%${lower}%`, limit) as Array<Record<string, unknown>>;
+
+    return rows.map((r) => ({
+      listingId:      String(r.listing_id),
+      skillName:      String(r.skill_name ?? r.skill_id ?? ""),
+      name:           String(r.name),
+      description:    String(r.description ?? ""),
+      priceCentsUsdc: Number(r.price_cents),
+      sellerAddress:  String(r.seller_address),
+      listingUrl:     String(r.listing_url ?? ""),
+      publishedAt:    String(r.published_at),
+      signature:      r.signature ? String(r.signature) : undefined,
+    }));
+  } catch {
+    return [];
+  }
+}

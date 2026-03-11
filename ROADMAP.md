@@ -1,6 +1,6 @@
 # Galvin — Roadmap: Next Evolution
 
-> **Status:** Feature 1 ✅ DONE (v0.3.1) | Feature 2 ✅ DONE (v0.3.2) | Feature 3 ✅ DONE (v0.3.3) | Feature 4 ✅ DONE (v0.3.4) | Feature 5 ✅ DONE (v0.3.5) | Feature 6 ✅ DONE (v0.3.6) | Feature 7 in progress  
+> **Status:** Feature 1 ✅ DONE (v0.3.1) | Feature 2 ✅ DONE (v0.3.2) | Feature 3 ✅ DONE (v0.3.3) | Feature 4 ✅ DONE (v0.3.4) | Feature 5 ✅ DONE (v0.3.5) | Feature 6 ✅ DONE (v0.3.6) | Feature 7 ✅ DONE (v0.3.7)  
 > **Base:** Galvin v0.3.0 on `@conway/automaton` v0.2.1  
 > **Principle:** Every feature below hooks into real existing files. No mocks. No stubs. No placeholder data.
 
