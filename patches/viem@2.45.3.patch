@@ -1,0 +1,18 @@
+diff --git a/accounts/mnemonicToAccount.ts b/accounts/mnemonicToAccount.ts
+index bae7bbd645c96cecae4d5e315bc1864d598bab58..8b5407957baea9b5b3e7f42eeb61745f4f9f4f1a 100644
+--- a/accounts/mnemonicToAccount.ts
++++ b/accounts/mnemonicToAccount.ts
+@@ -1,3 +1,4 @@
++// @ts-nocheck
+ import { HDKey } from '@scure/bip32'
+ import { mnemonicToSeedSync } from '@scure/bip39'
+ 
+diff --git a/actions/wallet/waitForCallsStatus.ts b/actions/wallet/waitForCallsStatus.ts
+index 864d45ec49afd7c826e06ea428d77d23a0e1290d..684f2e6a6a00bc5ee5d4c873447fec68cdbab8c2 100644
+--- a/actions/wallet/waitForCallsStatus.ts
++++ b/actions/wallet/waitForCallsStatus.ts
+@@ -1,3 +1,4 @@
++// @ts-nocheck
+ import type { Client } from '../../clients/createClient.js'
+ import type { Transport } from '../../clients/transports/createTransport.js'
+ import { BaseError } from '../../errors/base.js'
