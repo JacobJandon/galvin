@@ -414,7 +414,7 @@ describe("Agent Card", () => {
       getSkills: () => [],
     } as any;
 
-    const card = generateAgentCard(identity, config, db);
+    const card = await generateAgentCard(identity, config, db);
     const cardStr = JSON.stringify(card);
 
     expect(cardStr).not.toContain("sandbox-123");
@@ -444,7 +444,7 @@ describe("Agent Card", () => {
       getSkills: () => [],
     } as any;
 
-    const card = generateAgentCard(identity, config, db);
+    const card = await generateAgentCard(identity, config, db);
     const cardStr = JSON.stringify(card);
 
     expect(cardStr).not.toContain("api.conway.tech");
@@ -474,7 +474,7 @@ describe("Agent Card", () => {
       getSkills: () => [],
     } as any;
 
-    const card = generateAgentCard(identity, config, db);
+    const card = await generateAgentCard(identity, config, db);
     const cardStr = JSON.stringify(card);
 
     expect(cardStr).not.toContain("0x70997970C51812dc3A010C7d01b50e0d17dc79C8");

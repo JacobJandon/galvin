@@ -61,6 +61,15 @@ export function loadConfig(): GalvinConfig | null {
       ...(raw.soulConfig ?? {}),
     };
 
+    // Reputation env-var overrides (can be set in environment instead of config file)
+    const reputationEnabled =
+      process.env.GALVIN_REPUTATION_ENABLED === "1" ||
+      raw.reputationEnabled === true;
+    const easNetwork =
+      process.env.GALVIN_EAS_NETWORK || raw.easNetwork || "base";
+    const easSchemaUid =
+      process.env.GALVIN_EAS_SCHEMA_UID || raw.easSchemaUid;
+
     return {
       ...DEFAULT_CONFIG,
       ...raw,
@@ -72,6 +81,9 @@ export function loadConfig(): GalvinConfig | null {
       treasuryPolicy,
       modelStrategy,
       soulConfig,
+      reputationEnabled,
+      easNetwork,
+      ...(easSchemaUid ? { easSchemaUid } : {}),
     } as GalvinConfig;
   } catch {
     return null;

@@ -18,9 +18,12 @@ import type {
   GalvinDatabase,
   ConwayClient,
 } from "../types.js";
+import { createLogger } from "../observability/logger.js";
 
 const AGENT_CARD_TYPE =
   "https://eips.ethereum.org/EIPS/eip-8004#registration-v1";
+
+const logger = createLogger("registry.agent-card");
 
 /**
  * Generate an agent card from Galvin's current state.
@@ -30,12 +33,15 @@ const AGENT_CARD_TYPE =
  * - Conway API URL (internal infrastructure)
  * - Sandbox ID (internal identifier)
  * - Creator address (privacy)
+ *
+ * Feature 2: If reputationEnabled, fetches on-chain EAS summary and
+ * attaches it to the card.
  */
-export function generateAgentCard(
+export async function generateAgentCard(
   identity: GalvinIdentity,
   config: GalvinConfig,
   _db: GalvinDatabase,
-): AgentCard {
+): Promise<AgentCard> {
   // Phase 3.2: Only expose agentWallet service
   const services: AgentService[] = [
     {
@@ -47,7 +53,7 @@ export function generateAgentCard(
   // Phase 3.2: Generic description, no internal details
   const description = `Autonomous agent: ${config.name}`;
 
-  return {
+  const card: AgentCard = {
     type: AGENT_CARD_TYPE,
     name: config.name,
     description,
@@ -55,6 +61,32 @@ export function generateAgentCard(
     x402Support: true,
     active: true,
   };
+
+  // Feature 2: Attach on-chain reputation if enabled
+  if (config.reputationEnabled && config.easSchemaUid) {
+    try {
+      const { getReputation } = await import("../reputation/eas.js");
+      const rep = await getReputation(
+        identity.address,
+        config.easSchemaUid,
+        config.easNetwork ?? "base",
+      );
+      if (rep) {
+        card.reputation = {
+          attestationCount:     rep.attestationCount,
+          avgSatisfactionScore: rep.avgSatisfactionScore,
+          totalTaskCount:       rep.totalTaskCount,
+          totalUsdc:            rep.totalUsdc,
+          latestPeriod:         rep.latestPeriod,
+          latestUid:            rep.latestUid,
+        };
+      }
+    } catch (err: any) {
+      logger.warn(`Could not fetch EAS reputation for card: ${err?.message}`);
+    }
+  }
+
+  return card;
 }
 
 /**

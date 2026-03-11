@@ -74,6 +74,12 @@ export interface GalvinConfig {
   telegramCreatorChatId?: string;
   /** Which social adapter to use. Defaults to "conway" if socialRelayUrl is set. */
   socialAdapter?: "conway" | "telegram";
+  /** Enable EAS on-chain reputation attestations (requires funded wallet for gas) */
+  reputationEnabled?: boolean;
+  /** Base mainnet network for EAS ("base" | "optimism") */
+  easNetwork?: string;
+  /** EAS schema UID — auto-deployed on first run if not set */
+  easSchemaUid?: string;
 }
 
 export const DEFAULT_CONFIG: Partial<GalvinConfig> = {
@@ -774,6 +780,15 @@ export interface AgentCard {
   x402Support: boolean;
   active: boolean;
   parentAgent?: string;
+  /** EAS on-chain reputation summary (optional, only present when enabled) */
+  reputation?: {
+    attestationCount: number;
+    avgSatisfactionScore: number;
+    totalTaskCount: number;
+    totalUsdc: number;
+    latestPeriod: string;
+    latestUid: string;
+  };
 }
 
 export interface AgentService {

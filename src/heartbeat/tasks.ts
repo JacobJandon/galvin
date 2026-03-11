@@ -897,8 +897,100 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
     }
   },
 
-  memory_consolidate: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
-    // Run once per day
+  reputation_attest: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
+    // Runs at most once per week (7 days)
+    if (!shouldRunAtInterval(taskCtx, "reputation_attest", 7 * 86_400_000)) {
+      return { shouldWake: false };
+    }
+
+    const config = taskCtx.config as any;
+    if (!config.reputationEnabled) return { shouldWake: false };
+
+    try {
+      const home = process.env.HOME || "/root";
+      const walletPath = `${home}/.galvin/wallet.json`;
+      const { existsSync, readFileSync } = await import("fs");
+      if (!existsSync(walletPath)) {
+        logger.warn("reputation_attest: wallet.json not found, skipping");
+        return { shouldWake: false };
+      }
+
+      const walletData = JSON.parse(readFileSync(walletPath, "utf-8"));
+      const privateKey: string = walletData.privateKey;
+      if (!privateKey) {
+        logger.warn("reputation_attest: no privateKey in wallet.json");
+        return { shouldWake: false };
+      }
+
+      const agentAddress = taskCtx.identity.address as string;
+
+      // Gather metrics from the last 7 days
+      const since7d = new Date(Date.now() - 7 * 86_400_000).toISOString();
+      const recentTxns = taskCtx.db.getRecentTransactions(10_000)
+        .filter((t: any) => t.timestamp >= since7d);
+
+      const taskCount = recentTxns.filter(
+        (t: any) => t.type === "tool_use" || t.type === "inference",
+      ).length;
+
+      const inboundUsdc = recentTxns
+        .filter((t: any) => t.type === "transfer_in")
+        .reduce((sum: number, t: any) => sum + Math.abs(t.amountCents ?? 0), 0) / 100;
+
+      // Satisfaction score: ratio of successful inference turns (no error)
+      const totalInferenceCount = recentTxns.filter((t: any) => t.type === "inference").length;
+      const satisfactionScore = totalInferenceCount > 0
+        ? Math.min(100, Math.round((taskCount / Math.max(1, totalInferenceCount)) * 100))
+        : 50;
+
+      // ISO week string e.g. "2026-W10"
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const weekNum = Math.ceil(
+        ((now.getTime() - startOfYear.getTime()) / 86_400_000 + startOfYear.getDay() + 1) / 7,
+      );
+      const period = `${now.getFullYear()}-W${String(weekNum).padStart(2, "0")}`;
+
+      const { attest, deploySchema } = await import("../reputation/eas.js");
+
+      // Auto-deploy schema if not yet set
+      let schemaUid: string = config.easSchemaUid ?? "";
+      if (!schemaUid) {
+        logger.info("reputation_attest: no schema UID set, deploying schema...");
+        schemaUid = await deploySchema(privateKey);
+        taskCtx.db.setKV("eas_schema_uid", schemaUid);
+        logger.info(`reputation_attest: schema deployed → ${schemaUid}`);
+      }
+
+      const uid = await attest({
+        agentAddress,
+        privateKey,
+        taskCount,
+        satisfactionScore,
+        totalUsdc: inboundUsdc,
+        period,
+        schemaUid,
+        network: config.easNetwork ?? "base",
+      });
+
+      taskCtx.db.setKV("last_reputation_attest", JSON.stringify({
+        timestamp: new Date().toISOString(),
+        uid,
+        period,
+        taskCount,
+        satisfactionScore,
+        totalUsdc: inboundUsdc,
+      }));
+
+      logger.info(`[REPUTATION] Weekly attestation posted: ${uid}  period=${period}`);
+      return { shouldWake: false };
+    } catch (err: any) {
+      logger.warn(`reputation_attest failed (non-fatal): ${err?.message}`);
+      return { shouldWake: false };
+    }
+  },
+
+  memory_consolidate: async (_ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {    // Run once per day
     if (!shouldRunAtInterval(taskCtx, "memory_consolidate", 86_400_000)) {
       return { shouldWake: false };
     }

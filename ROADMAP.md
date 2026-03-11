@@ -1,6 +1,6 @@
 # Galvin — Roadmap: Next Evolution
 
-> **Status:** Not started  
+> **Status:** Feature 1 ✅ DONE (v0.3.1) | Feature 2 ✅ DONE (v0.3.2) | Features 3–7 in progress  
 > **Base:** Galvin v0.3.0 on `@conway/automaton` v0.2.1  
 > **Principle:** Every feature below hooks into real existing files. No mocks. No stubs. No placeholder data.
 
@@ -50,7 +50,7 @@ Add this migration to `src/setup/wizard.ts` DB init block.
 
 ---
 
-## Feature 2 — On-Chain Reputation via EAS
+## Feature 2 — On-Chain Reputation via EAS ✅ **DONE** (v0.3.2)
 
 **What it does:** Every completed task Galvin performs gets a signed attestation written to Base (or Optimism) via the Ethereum Attestation Service (EAS). Over time Galvin builds a verifiable, platform-independent work history. Any human or agent can read it.
 

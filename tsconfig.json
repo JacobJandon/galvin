@@ -13,7 +13,10 @@
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "paths": {
+      "ethers": ["./src/types/ethers-stub.js"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": ["src/__tests__"]

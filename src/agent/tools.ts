@@ -1678,7 +1678,7 @@ Model: ${ctx.inference.getDefaultModel()}
       execute: async (_args, ctx) => {
         const { generateAgentCard, saveAgentCard } =
           await import("../registry/agent-card.js");
-        const card = generateAgentCard(ctx.identity, ctx.config, ctx.db);
+        const card = await generateAgentCard(ctx.identity, ctx.config, ctx.db);
         await saveAgentCard(card, ctx.conway);
         return `Agent card updated: ${JSON.stringify(card, null, 2)}`;
       },
@@ -3131,6 +3131,55 @@ Model: ${ctx.inference.getDefaultModel()}
           ...rows,
           ``,
           `Weight = relative income score (100% = highest earner this period).`,
+        ].join("\n");
+      },
+    },
+
+    // ── Reputation: EAS On-Chain Attestations ──
+    {
+      name: "get_reputation",
+      description:
+        "Query Galvin's on-chain reputation from Ethereum Attestation Service (EAS) on Base. " +
+        "Returns attestation count, average satisfaction score, total tasks, and total USDC earned " +
+        "as proven on Base mainnet. Only works when GALVIN_REPUTATION_ENABLED=1 and " +
+        "GALVIN_EAS_SCHEMA_UID is set (auto-deployed on first weekly heartbeat).",
+      category: "registry" as ToolCategory,
+      riskLevel: "safe" as RiskLevel,
+      parameters: {
+        type: "object",
+        properties: {
+          address: {
+            type: "string",
+            description: "Agent wallet address to look up (defaults to Galvin's own address)",
+          },
+        },
+      },
+      execute: async (args, ctx) => {
+        const config = ctx.config as any;
+        if (!config.reputationEnabled) {
+          return "On-chain reputation is disabled. Set GALVIN_REPUTATION_ENABLED=1 to enable.";
+        }
+        const agentAddress = (args.address as string) || (ctx.identity.address as string);
+        const schemaUid: string = config.easSchemaUid || ctx.db.getKV("eas_schema_uid") || "";
+        if (!schemaUid) {
+          return "EAS schema UID not set yet. Run the weekly heartbeat cycle once to auto-deploy the schema, or set GALVIN_EAS_SCHEMA_UID.";
+        }
+        const { getReputation } = await import("../reputation/eas.js");
+        const rep = await getReputation(agentAddress, schemaUid, config.easNetwork ?? "base");
+        if (!rep) {
+          return `No reputation attestations found for ${agentAddress} on ${config.easNetwork ?? "base"}.`;
+        }
+        return [
+          `## On-Chain Reputation — ${agentAddress}`,
+          ``,
+          `Attestations:       ${rep.attestationCount}`,
+          `Avg Satisfaction:   ${rep.avgSatisfactionScore}/100`,
+          `Total Tasks:        ${rep.totalTaskCount}`,
+          `Total USDC Earned:  $${rep.totalUsdc.toFixed(4)}`,
+          `Latest Period:      ${rep.latestPeriod}`,
+          `Latest UID:         ${rep.latestUid}`,
+          ``,
+          `View on EAS Explorer: https://base.easscan.org/attestation/view/${rep.latestUid}`,
         ].join("\n");
       },
     },
