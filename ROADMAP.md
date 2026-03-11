@@ -1,6 +1,6 @@
 # Galvin — Roadmap: Next Evolution
 
-> **Status:** Feature 1 ✅ DONE (v0.3.1) | Feature 2 ✅ DONE (v0.3.2) | Feature 3 ✅ DONE (v0.3.3) | Feature 4 ✅ DONE (v0.3.4) | Feature 5 ✅ DONE (v0.3.5) | Features 6–7 in progress  
+> **Status:** Feature 1 ✅ DONE (v0.3.1) | Feature 2 ✅ DONE (v0.3.2) | Feature 3 ✅ DONE (v0.3.3) | Feature 4 ✅ DONE (v0.3.4) | Feature 5 ✅ DONE (v0.3.5) | Feature 6 ✅ DONE (v0.3.6) | Feature 7 in progress  
 > **Base:** Galvin v0.3.0 on `@conway/automaton` v0.2.1  
 > **Principle:** Every feature below hooks into real existing files. No mocks. No stubs. No placeholder data.
 
@@ -215,7 +215,7 @@ GALVIN_RED_TEAM_PROMPT_COUNT: string     // adversarial prompts per session, def
 
 ---
 
-## Feature 6 — Dead Man's Switch (Continuity Through Death)
+## Feature 6 — Dead Man's Switch (Continuity Through Death) ✅ **DONE** (v0.3.6)
 
 **What it does:** If Galvin enters the DEAD state with no revival funds coming, before the process exits it encrypts its memory and private keys, posts a retrieval hint on-chain (EAS attestation or IPFS CID on Base), and writes a human-readable recovery note. Anyone with the passphrase can resurrect it with full continuity.
 

@@ -81,6 +81,19 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
       };
       taskCtx.db.setKV("last_distress", JSON.stringify(distressPayload));
 
+      // Feature 6: arm dead man's switch on first dead-tier tick
+      if (tier === "dead") {
+        const alreadyArmed = taskCtx.db.getKV("dms_armed_at");
+        if (!alreadyArmed) {
+          import("../survival/dead-mans-switch.js")
+            .then(({ armSwitch }) =>
+              armSwitch(taskCtx.config, (taskCtx.db as any).raw, taskCtx.identity),
+            )
+            .then(() => taskCtx.db.setKV("dms_armed_at", new Date().toISOString()))
+            .catch((e) => logger.warn(`DMS arm failed: ${e?.message}`));
+        }
+      }
+
       return {
         shouldWake: true,
         message: `Distress: ${tier}. Credits: $${(credits / 100).toFixed(2)}. Need funding.`,

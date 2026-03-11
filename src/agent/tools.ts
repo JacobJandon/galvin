@@ -2377,6 +2377,41 @@ Model: ${ctx.inference.getDefaultModel()}
       },
     },
 
+    {
+      name: "check_revival_status",
+      description:
+        "Check whether the dead man's switch has fired — i.e. if a revival.txt file exists from a previous death event.",
+      category: "survival",
+      riskLevel: "safe",
+      parameters: { type: "object", properties: {}, required: [] },
+      execute: async (_args, _ctx) => {
+        const { checkForRevival } = await import("../survival/dead-mans-switch.js");
+        const revival = checkForRevival();
+        if (!revival) return "No revival file found. Dead man's switch has not fired.";
+        return [
+          "Revival file detected — agent was previously in DEAD state.",
+          `CID:         ${revival.cid ?? "(none — local backup only)"}`,
+          `Local path:  ${revival.localPath ?? "(none)"}`,
+          "",
+          "To disarm (after successful resurrection), run: disarm_dead_mans_switch",
+        ].join("\n");
+      },
+    },
+
+    {
+      name: "disarm_dead_mans_switch",
+      description:
+        "Disarm the dead man's switch after successful revival — removes revival.txt and the local encrypted snapshot.",
+      category: "survival",
+      riskLevel: "caution",
+      parameters: { type: "object", properties: {}, required: [] },
+      execute: async (_args, _ctx) => {
+        const { disarmSwitch } = await import("../survival/dead-mans-switch.js");
+        disarmSwitch();
+        return "Dead man's switch disarmed. Revival files removed.";
+      },
+    },
+
     // === Phase 3.2: Social & Registry Tools ===
 
     // ── Social / Messaging Tools ──

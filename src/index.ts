@@ -417,6 +417,48 @@ async function run(): Promise<void> {
   const dbPath = resolvePath(config.dbPath);
   const db = createDatabase(dbPath);
 
+  // ── Feature 6: Dead Man's Switch — revival check ─────────
+  {
+    const { checkForRevival, loadRevivalSnapshot, disarmSwitch } = await import("./survival/dead-mans-switch.js");
+    const revival = checkForRevival();
+    if (revival) {
+      logger.warn(`GALVIN RESURRECTED — loading inherited memory from ${revival.cid ?? revival.localPath ?? "local backup"}`);
+      const encKey = process.env["GALVIN_ENCRYPTION_KEY"];
+      if (encKey) {
+        const snapshot = await loadRevivalSnapshot(encKey).catch(() => null);
+        if (snapshot) {
+          // Re-seed episodic memories
+          for (const ep of snapshot.episodic ?? []) {
+            try {
+              const e = ep as any;
+              db.raw
+                .prepare(
+                  `INSERT OR IGNORE INTO episodic_memory (id, event_type, summary, created_at)
+                   VALUES (?, ?, ?, ?)`,
+                )
+                .run(e.id, e.event_type, e.summary, e.created_at);
+            } catch { /* column mismatch in old schema is OK */ }
+          }
+          // Re-seed knowledge store
+          for (const kv of snapshot.knowledge ?? []) {
+            try {
+              const k = kv as any;
+              db.raw
+                .prepare(`INSERT OR IGNORE INTO knowledge_store (key, value, created_at) VALUES (?, ?, ?)`)
+                .run(k.key, k.value, k.created_at);
+            } catch { /* ignore */ }
+          }
+          logger.info(
+            `Revival complete: ${(snapshot.episodic ?? []).length} episodic + ${(snapshot.knowledge ?? []).length} knowledge entries restored`,
+          );
+        }
+      } else {
+        logger.warn("GALVIN_ENCRYPTION_KEY not set — cannot decrypt revival snapshot");
+      }
+      disarmSwitch();
+    }
+  }
+
   // Persist createdAt: only set if not already stored (never overwrite)
   const existingCreatedAt = db.getIdentity("createdAt");
   const createdAt = existingCreatedAt || new Date().toISOString();
