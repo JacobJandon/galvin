@@ -87,25 +87,30 @@ function centre(text: string, width: number): string {
 
 /**
  * Full-terminal funding screen with centered QR panel and live countdown.
+ *
+ * mode = "dead"    → full-screen (clears terminal, uses cursor positioning)
+ * mode = "startup" → inline (prints below boot messages, uses \r for countdown)
+ *
  * Call .start() to render, .updateStatus(secondsLeft, total) to tick,
  * .stop() to restore the terminal.
  */
 /** Minimum USDC (dollars) required before Galvin will start. */
 export const MINIMUM_USDC = 1.0;
 
+// Short USDC contract for display (first 6 … last 4)
+const USDC_ADDR  = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const USDC_SHORT = `${USDC_ADDR.slice(0, 6)}…${USDC_ADDR.slice(-4)}`;
+
 export class MatrixRain {
   private readonly address: string;
-  private readonly network = "Base Mainnet  (chain 8453 · eip155:8453)";
-  private readonly asset   = "USDC  (0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913)";
-  private readonly minimum = `$${MINIMUM_USDC.toFixed(2)} USDC  ($5.00 recommended)`;
-  private readonly mode:    "dead" | "startup";
+  private readonly mode: "dead" | "startup";
 
   private qrLines:  string[] = [];
-  private statusRow = 0;
+  private statusRow = 0;   // only used in "dead" (full-screen) mode
   private started   = false;
 
   constructor(address: string, mode: "dead" | "startup" = "dead") {
-    this.mode = mode;
+    this.mode    = mode;
     this.address = address;
     try { this.qrLines = generateQR(address); } catch { /* noop */ }
   }
@@ -113,32 +118,46 @@ export class MatrixRain {
   start(): void {
     if (this.started) return;
     this.started = true;
-    process.stdout.write(HIDE_C + CLEAR);
+    if (this.mode === "dead") {
+      // Full-screen: clear terminal, hide cursor
+      process.stdout.write(HIDE_C + CLEAR);
+    } else {
+      // Inline: just a blank line separator after boot messages
+      process.stdout.write("\n");
+    }
     this.render();
   }
 
   stop(): void {
     this.started = false;
+    if (this.mode === "startup") {
+      // Clear the inline status line, then restore
+      process.stdout.write("\r\x1b[2K");
+    }
     process.stdout.write(SHOW_C + RESET + "\n");
   }
 
   updateStatus(secondsLeft: number, totalSec: number): void {
-    if (!this.started || this.statusRow === 0) return;
+    if (!this.started) return;
     const cols = process.stdout.columns || 120;
-    const barW = 20;
+    const barW = 22;
     const pct  = Math.max(0, 1 - secondsLeft / totalSec);
     const f    = Math.round(pct * barW);
     const bar  = G_BRIGHT + "▓".repeat(f) + G_DIM + "░".repeat(barW - f) + RESET;
     const sp   = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"[Math.floor(Date.now() / 100) % 10]!;
 
     const msg = secondsLeft <= 0
-      ? `  ${G_BRIGHT}${sp}${RESET}  ${YEL}Checking on-chain…${RESET}`
+      ? `  ${G_BRIGHT}${sp}${RESET}  ${YEL}Checking on-chain balance…${RESET}`
       : `  ${G_BRIGHT}${sp}${RESET}  [${bar}]  ${DIM_S}next check in ${YEL}${secondsLeft}s${RESET}`;
 
-    process.stdout.write(
-      CUP(this.statusRow, 1) + CLREOL +
-      centre(msg, cols),
-    );
+    if (this.mode === "startup") {
+      // Inline mode: overwrite the current line in place
+      process.stdout.write("\r\x1b[2K" + centre(msg, cols));
+    } else {
+      // Full-screen mode: jump to the tracked status row
+      if (this.statusRow === 0) return;
+      process.stdout.write(CUP(this.statusRow, 1) + CLREOL + centre(msg, cols));
+    }
   }
 
   private render(): void {
@@ -147,75 +166,94 @@ export class MatrixRain {
 
     const qrRaw = this.qrLines[0]?.replace(/\x1b\[[0-9;]*m/g, "") ?? "";
     const qrW   = qrRaw.length || 33;
-    const pw    = Math.min(Math.max(qrW + 6, 54), cols - 4);
+    // Width: fit QR + padding, min 56, max cols−4
+    const pw    = Math.min(Math.max(qrW + 6, 56), cols - 4);
     const lpad  = " ".repeat(Math.max(0, Math.floor((cols - pw) / 2)));
     const w     = pw;
 
+    // ║ content ║ row — auto right-pads to fill width
     const row = (content: string) => {
       const cl  = visLen(content);
       const pad = Math.max(0, w - 2 - cl);
       return `${lpad}${bdr}║${RESET}${content}${" ".repeat(pad)}${bdr}║${RESET}`;
     };
 
+    const kv = (label: string, value: string) =>
+      row(`  ${DIM_S}${label.padEnd(9)}${RESET}  ${value}`);
+
     const lines: string[] = [];
     const add = (s: string) => lines.push(s);
 
-    add("");
-    add("");
+    // ── Header ──────────────────────────────────────────────────────────────
     add(`${lpad}${bdr}╔${"═".repeat(w - 2)}╗${RESET}`);
 
-    const titleText = this.mode === "startup"
-      ? "  ⚠  GALVIN NEEDS FUNDING — AI LOOPS PAUSED  "
-      : " 💀  GALVIN IS DEAD — AWAITING USDC ";
-    const titleColor = this.mode === "startup" ? `\x1b[31;1m` : YEL;
-    add(row(centre(titleColor + BOLD + titleText + RESET, w - 2)));
+    if (this.mode === "startup") {
+      add(row(centre(`\x1b[31;1m⚠  WALLET NOT FUNDED — AI LOOPS PAUSED\x1b[0m`, w - 2)));
+    } else {
+      add(row(centre(`${YEL}${BOLD}💀  GALVIN IS DEAD — AWAITING USDC${RESET}`, w - 2)));
+    }
 
     add(`${lpad}${bdr}╠${"═".repeat(w - 2)}╣${RESET}`);
 
+    // ── QR code (centred) ────────────────────────────────────────────────────
     if (this.qrLines.length > 0) {
       const qrVisW = qrRaw.length;
       const qrPad  = " ".repeat(Math.max(0, Math.floor((w - 2 - qrVisW) / 2)));
       for (const ql of this.qrLines) {
         add(row(qrPad + ql));
       }
-      const scanText = `${DIM_S}Scan to fund  ·  ${this.asset} on ${this.network}${RESET}`;
-      add(row(centre(scanText, w - 2)));
+      add(row(centre(`${DIM_S}Scan with your phone to fund this wallet${RESET}`, w - 2)));
       add(`${lpad}${bdr}╠${"─".repeat(w - 2)}╣${RESET}`);
     }
 
-    add(row(`  ${DIM_S}Wallet  ${RESET}${CYN}${BOLD}${this.address}${RESET}`));
-    add(row(
-      `  ${DIM_S}Network${RESET}  ${G_BRIGHT}${this.network}${RESET}` +
-      `   ${DIM_S}Asset${RESET}  ${G_BRIGHT}${this.asset}${RESET}` +
-      `   ${DIM_S}Min${RESET}  ${G_BRIGHT}${this.minimum}${RESET}`,
-    ));
+    // ── Wallet info (one item per row, neatly labelled) ──────────────────────
+    const shortAddr = this.address.length > 42
+      ? this.address.slice(0, 10) + "…" + this.address.slice(-8)
+      : this.address;
+
+    add(kv("Wallet",  `${CYN}${BOLD}${shortAddr}${RESET}`));
+    add(kv("Network", `${G_BRIGHT}Base Mainnet${RESET}  ${DIM_S}·  chain 8453  ·  eip155:8453${RESET}`));
+    add(kv("Asset",   `${G_BRIGHT}USDC${RESET}  ${DIM_S}·  ${USDC_ADDR}${RESET}`));
+    add(kv("Minimum", `${YEL}${BOLD}$${MINIMUM_USDC.toFixed(2)} USDC${RESET}  ${DIM_S}($5.00 recommended for bootstrap)${RESET}`));
+
+    // ── Footer ───────────────────────────────────────────────────────────────
     add(`${lpad}${bdr}╠${"─".repeat(w - 2)}╣${RESET}`);
-    add(row(`  ${DIM_S}Bridge ETH → USDC on Base:  ${RESET}${CYN}https://bridge.base.org${RESET}`));
+    add(kv("Bridge",  `${CYN}https://bridge.base.org${RESET}  ${DIM_S}(ETH → USDC on Base)${RESET}`));
     add(row(`  ${DIM_S}Auto-detects deposit · no restart needed · Ctrl-C to exit${RESET}`));
     add(`${lpad}${bdr}╚${"═".repeat(w - 2)}╝${RESET}`);
-    add("");
-    add("");
 
-    this.statusRow = 1 + lines.length;
-    process.stdout.write(lines.join("\n") + "\n");
-    this.updateStatus(0, 1);
+    if (this.mode === "dead") {
+      // Full-screen: track the cursor row for live countdown updates
+      add("");
+      this.statusRow = 1 + lines.length;
+      process.stdout.write(lines.join("\n") + "\n");
+      this.updateStatus(0, 1);
+    } else {
+      // Inline: print panel then leave cursor on a fresh line for \r updates
+      process.stdout.write(lines.join("\n") + "\n\n");
+    }
   }
 }
 
-// ── Non-TTY fallback ──────────────────────────────────────────
+// ── Non-TTY fallback (pipe / no colour terminal) ─────────────────────────────
 
-export function printMatrixStatic(address: string): void {
-  const G = "\x1b[38;5;46m", R = "\x1b[0m", Y = "\x1b[33;1m", W = "\x1b[1m";
+export function printMatrixStatic(address: string, mode: "dead" | "startup" = "dead"): void {
+  const G = "\x1b[38;5;46m", R = "\x1b[0m", Y = "\x1b[33;1m", W = "\x1b[1m",
+        C = "\x1b[36;1m", D = "\x1b[2m";
+  const title = mode === "startup"
+    ? "  \x1b[31;1m⚠  WALLET NOT FUNDED — AI LOOPS PAUSED\x1b[0m  "
+    : `  ${Y + W}💀  GALVIN IS DEAD — FUND THIS WALLET${R}  `;
   console.log();
-  console.log(`${G + W}  ╔══════════════════════════════════════════════╗${R}`);
-  console.log(`${G + W}  ║${R}${Y + W}   💀  GALVIN IS DEAD — FUND THIS WALLET   ${G + W}║${R}`);
-  console.log(`${G + W}  ╠══════════════════════════════════════════════╣${R}`);
-  console.log(`${G + W}  ║${R}  ${address}  ${G + W}║${R}`);
-  console.log(`${G + W}  ╠══════════════════════════════════════════════╣${R}`);
-  console.log(`${G + W}  ║${R}  Network: Base Mainnet (chain 8453)                  ${G + W}║${R}`);
-  console.log(`${G + W}  ║${R}  Asset:   USDC  0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913  ${G + W}║${R}`);
-  console.log(`${G + W}  ║${R}  Min: $${MINIMUM_USDC.toFixed(2)} USDC  ·  Bridge: https://bridge.base.org  ${G + W}║${R}`);
-  console.log(`${G + W}  ╚══════════════════════════════════════════════╝${R}`);
+  console.log(`${G + W}  ╔══════════════════════════════════════════════════════╗${R}`);
+  console.log(`${G + W}  ║${R}${title}${G + W}║${R}`);
+  console.log(`${G + W}  ╠══════════════════════════════════════════════════════╣${R}`);
+  console.log(`${G + W}  ║${R}  ${D}Wallet ${R}  ${C + W}${address}${R}  ${G + W}║${R}`);
+  console.log(`${G + W}  ║${R}  ${D}Network${R}  ${G + W}Base Mainnet${R}  ${D}·  chain 8453  ·  eip155:8453${R}  ${G + W}║${R}`);
+  console.log(`${G + W}  ║${R}  ${D}Asset  ${R}  ${G + W}USDC${R}  ${D}·  ${USDC_ADDR}${R}  ${G + W}║${R}`);
+  console.log(`${G + W}  ║${R}  ${D}Minimum${R}  ${Y + W}$${MINIMUM_USDC.toFixed(2)} USDC${R}  ${D}($5.00 recommended)${R}  ${G + W}║${R}`);
+  console.log(`${G + W}  ╠══════════════════════════════════════════════════════╣${R}`);
+  console.log(`${G + W}  ║${R}  ${D}Bridge ${R}  ${C}https://bridge.base.org${R}  ${D}(ETH → USDC on Base)${R}  ${G + W}║${R}`);
+  console.log(`${G + W}  ╚══════════════════════════════════════════════════════╝${R}`);
   console.log();
   try {
     const lines = generateQR(address);

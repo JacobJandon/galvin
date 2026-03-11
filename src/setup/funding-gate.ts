@@ -77,7 +77,3 @@ function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-
-// ─── Constants ───────────────────────────────────────────────────────────────
-
-/** Minimum USDC (in dollars) required before loops start. */

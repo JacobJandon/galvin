@@ -68,7 +68,7 @@ export function showFundingScreen(
     return _rain;
   }
   // Non-TTY fallback — plain box + QR lines to stdout
-  printMatrixStatic(walletAddress);
+  printMatrixStatic(walletAddress, mode);
   return new MatrixRain(walletAddress, mode); // inert — not started
 }
 
