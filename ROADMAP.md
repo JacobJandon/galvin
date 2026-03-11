@@ -8,7 +8,7 @@ Seven features that turn Galvin from a surviving agent into a truly unique Solva
 
 ---
 
-## Feature 1 — Economic Memory That Compounds
+## Feature 1 — Economic Memory That Compounds ✅ **DONE** (v0.3.1)
 
 **What it does:** Galvin tracks which skills and tasks generated income, which users paid, and over time reallocates its heartbeat compute budget toward what earns most. It becomes a self-optimizing business.
 
@@ -303,7 +303,7 @@ GALVIN_DMS_HINT: string                // human-readable hint for the passphrase
 
 | # | Feature | Why this order |
 |---|---|---|
-| 1 | Economic Memory | Runs entirely in-process, no new infra. Immediately makes Galvin smarter about earning. |
+| 1 | ✅ Economic Memory | Runs entirely in-process, no new infra. Immediately makes Galvin smarter about earning. |
 | 2 | On-Chain Reputation | Needs a wallet (already exists). Adds value before offspring so children inherit a reputation. |
 | 3 | Offspring / Forking | Needs reputation (Feature 2) so children are born with a verifiable parent identity. |
 | 4 | Red Team | Needs a stable agent loop to adversarially probe. Low risk — dry-run only. |
