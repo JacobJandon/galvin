@@ -400,19 +400,19 @@ export function createConwayClient(options: ConwayClientOptions): ConwayClient {
 
     const payloadHash = hashIdentityPayload(payload);
     const domain = {
-      name: "AIWS Galvin",
+      name: "AIWS Automaton",
       version: "1",
       chainId: 8453,
     };
     const types = {
       Register: [
-        { name: "galvinId", type: "string" },
+        { name: "automatonId", type: "string" },
         { name: "nonce", type: "string" },
         { name: "payloadHash", type: "bytes32" },
       ],
     };
     const message = {
-      galvinId,
+      automatonId: galvinId,
       nonce,
       payloadHash,
     };
