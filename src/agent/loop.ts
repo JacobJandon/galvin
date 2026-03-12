@@ -371,6 +371,12 @@ export async function runAgentLoop(
   // doesn't immediately go back to sleep on startup.
   db.deleteKV("sleep_until");
 
+  // Clear stale blocked_goal_backoff — if the goal is still blocked on restart
+  // the agent learns this within the first turn. Accumulated backoff from prior
+  // runs was causing the agent to sleep 4–10 minutes immediately after boot,
+  // preventing the orchestrator from ever planning the active goal.
+  db.deleteKV("blocked_goal_backoff");
+
   // Transition to waking state
   db.setAgentState("waking");
   onStateChange?.("waking");

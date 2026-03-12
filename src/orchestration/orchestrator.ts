@@ -516,6 +516,20 @@ export class Orchestrator {
       };
     }
 
+    // If the goal was cancelled or completed externally, reset to idle
+    // so the orchestrator can pick up any new active goals.
+    if (goal.status !== "active") {
+      logger.info("Goal no longer active, resetting orchestrator to idle", {
+        goalId: goal.id,
+        status: goal.status,
+      });
+      return {
+        ...state,
+        phase: "idle",
+        goalId: null,
+      };
+    }
+
     // Recover stale tasks: workers that died (process restart, sandbox crash)
     // leave tasks stuck in 'assigned' forever. Detect and reset them.
     if (this.params.isWorkerAlive) {
