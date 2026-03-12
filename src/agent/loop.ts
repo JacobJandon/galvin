@@ -581,6 +581,21 @@ export async function runAgentLoop(
             `[ORCHESTRATOR] phase=${orchestratorTick.phase} assigned=${orchestratorTick.tasksAssigned} completed=${orchestratorTick.tasksCompleted} failed=${orchestratorTick.tasksFailed}`,
           );
         }
+
+        // When workers are executing and nothing new happened this tick, skip
+        // the inference call entirely to avoid burning credits on repetitive
+        // status checks.  Sleep briefly so the orchestrator tick can pick up
+        // completed work on the next iteration.
+        if (
+          orchestratorTick.phase === "executing" &&
+          orchestratorTick.tasksAssigned === 0 &&
+          orchestratorTick.tasksCompleted === 0 &&
+          orchestratorTick.tasksFailed === 0
+        ) {
+          log(config, `[ORCHESTRATOR] Workers active, nothing new — waiting 15s before next tick`);
+          await new Promise((r) => setTimeout(r, 15_000));
+          continue;
+        }
       }
 
       if (planModeController) {

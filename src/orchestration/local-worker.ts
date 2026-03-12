@@ -20,6 +20,7 @@ import { completeTask, failTask } from "./task-graph.js";
 import type { TaskNode, TaskResult } from "./task-graph.js";
 import type { Database } from "better-sqlite3";
 import type { ConwayClient } from "../types.js";
+import { insertWakeEvent } from "../state/database.js";
 
 function truncateOutput(text: string, maxLen: number): string {
   if (text.length <= maxLen) return text;
@@ -111,6 +112,7 @@ export class LocalWorkerPool {
         });
         try {
           failTask(this.config.db, task.id, `Worker crashed: ${error instanceof Error ? error.message : String(error)}`, true);
+          try { insertWakeEvent(this.config.db, "local-worker", `task_failed:${task.id}`); } catch { /* best-effort */ }
         } catch { /* task may already be in terminal state */ }
       })
       .finally(() => {
@@ -171,6 +173,7 @@ export class LocalWorkerPool {
       if (signal.aborted) {
         logger.info(`[WORKER ${workerId}] Aborted on turn ${turn}`);
         failTask(this.config.db, task.id, "Worker aborted", false);
+        try { insertWakeEvent(this.config.db, "local-worker", `task_aborted:${task.id}`); } catch { /* best-effort */ }
         return;
       }
 
@@ -178,6 +181,7 @@ export class LocalWorkerPool {
       if (Date.now() - startedAt > timeoutMs) {
         logger.warn(`[WORKER ${workerId}] Timed out after ${timeoutMs}ms on turn ${turn}`);
         failTask(this.config.db, task.id, `Worker timed out after ${timeoutMs}ms`, true);
+        try { insertWakeEvent(this.config.db, "local-worker", `task_timeout:${task.id}`); } catch { /* best-effort */ }
         return;
       }
 
@@ -195,6 +199,7 @@ export class LocalWorkerPool {
         const msg = error instanceof Error ? error.message : String(error);
         logger.error(`[WORKER ${workerId}] Inference failed on turn ${turn + 1}`, error instanceof Error ? error : new Error(msg));
         failTask(this.config.db, task.id, `Inference failed: ${msg}`, true);
+        try { insertWakeEvent(this.config.db, "local-worker", `task_failed:${task.id}`); } catch { /* best-effort */ }
         return;
       }
 
@@ -263,6 +268,9 @@ export class LocalWorkerPool {
 
     try {
       completeTask(this.config.db, task.id, result);
+      // Wake the main agent so it picks up newly-unblocked tasks
+      // instead of sleeping through the worker's completion.
+      try { insertWakeEvent(this.config.db, "local-worker", `task_completed:${task.id}`); } catch { /* best-effort */ }
       logger.info("Local worker completed task", {
         workerId,
         taskId: task.id,
