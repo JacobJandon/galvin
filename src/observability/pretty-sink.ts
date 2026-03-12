@@ -80,6 +80,14 @@ export function prettySink(entry: LogEntry): void {
       line += "\n" + chalk.red("  " + entry.error.message);
     }
 
+    if (entry.context && Object.keys(entry.context).length > 0 &&
+        (entry.level === "error" || entry.level === "fatal" || entry.level === "warn")) {
+      const ctxStr = Object.entries(entry.context)
+        .map(([k, v]) => `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`)
+        .join(" | ");
+      line += "\n" + chalk.dim("  " + ctxStr);
+    }
+
     process.stdout.write(line + "\n");
   } catch {
     process.stdout.write(entry.message + "\n");
