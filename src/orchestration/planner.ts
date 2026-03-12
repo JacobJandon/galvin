@@ -1,6 +1,9 @@
 import type { Goal, TaskNode } from "./task-graph.js";
 import { UnifiedInferenceClient } from "../inference/inference-client.js";
 import type { ModelTier } from "../inference/provider-registry.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("orchestration.planner");
 
 export interface PlannerOutput {
   analysis: string;
@@ -60,6 +63,7 @@ export async function planGoal(
   context: PlannerContext,
   inference: UnifiedInferenceClient,
 ): Promise<PlannerOutput> {
+  logger.info("planner_start", { goalId: goal.id, goalTitle: goal.title });
   const systemPrompt = buildPlannerPrompt(context);
   const userPrompt = buildPlannerUserPrompt({
     mode: "plan_goal",
@@ -76,7 +80,9 @@ export async function planGoal(
   });
 
   const parsed = parsePlannerResponse(result.content);
-  return validatePlannerOutput(parsed);
+  const output = validatePlannerOutput(parsed);
+  logger.info("planner_complete", { goalId: goal.id, tasks: output.tasks.length, risks: output.risks.length });
+  return output;
 }
 
 export async function replanAfterFailure(
@@ -85,6 +91,7 @@ export async function replanAfterFailure(
   context: PlannerContext,
   inference: UnifiedInferenceClient,
 ): Promise<PlannerOutput> {
+  logger.warn("planner_replan", { goalId: goal.id, failedTaskId: failedTask.id });
   const systemPrompt = buildPlannerPrompt(context);
   const userPrompt = buildPlannerUserPrompt({
     mode: "replan_after_failure",

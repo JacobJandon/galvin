@@ -6,6 +6,9 @@ import {
   type ModelConfig,
   type ResolvedModel,
 } from "./provider-registry.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("inference.client");
 
 const RETRYABLE_STATUS_CODES = new Set([429, 500, 503]);
 const RETRY_BACKOFF_MS = [1000, 2000, 4000] as const;
@@ -116,6 +119,14 @@ export class UnifiedInferenceClient {
       try {
         const attempt = await this.executeWithRetries(resolved, params, params.tier);
         this.markProviderSuccess(resolved.provider.id);
+        logger.debug("inference_success", {
+          provider: resolved.provider.id,
+          model: resolved.model.id,
+          tier: params.tier,
+          totalTokens: attempt.result.usage.totalTokens,
+          costCredits: attempt.result.cost.totalCostCredits,
+          latencyMs: attempt.result.metadata.latencyMs,
+        });
 
         return {
           ...attempt.result,
@@ -133,6 +144,13 @@ export class UnifiedInferenceClient {
         totalRetries += error.retries;
         failedProviders.push(resolved.provider.id);
         this.markProviderFailure(resolved.provider.id);
+        logger.warn("inference_provider_failed", {
+          provider: resolved.provider.id,
+          tier: params.tier,
+          retries: error.retries,
+          retryable: error.retryable,
+          error: String(error.originalError),
+        });
 
         if (error.retryable) {
           continue;
@@ -142,6 +160,7 @@ export class UnifiedInferenceClient {
       }
     }
 
+    logger.error("inference_all_providers_failed", undefined, { tier: params.tier, failedProviders });
     throw new Error(
       `All providers failed for tier '${params.tier}'. Failed providers: ${failedProviders.join(", ")}`,
     );
@@ -149,6 +168,7 @@ export class UnifiedInferenceClient {
 
   async chatDirect(params: UnifiedChatDirectParams): Promise<UnifiedInferenceResult> {
     if (this.isProviderCircuitOpen(params.providerId)) {
+      logger.warn("inference_circuit_open", { provider: params.providerId });
       throw new Error(`Provider '${params.providerId}' circuit is open`);
     }
 

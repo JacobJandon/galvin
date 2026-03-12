@@ -12,6 +12,9 @@ import type {
   ThreatLevel,
   SanitizationMode,
 } from "../types.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("agent.injection-defense");
 
 // ─── Constants ──────────────────────────────────────────────────
 
@@ -146,6 +149,7 @@ export function sanitizeInput(
 
   // Size limit check
   if (raw.length > MAX_MESSAGE_SIZE) {
+    logger.warn("input_blocked_size", { source: safeSource, size: raw.length, limit: MAX_MESSAGE_SIZE });
     return {
       content: `[BLOCKED: Message from ${safeSource} exceeded size limit (${raw.length} bytes)]`,
       blocked: true,
@@ -162,6 +166,7 @@ export function sanitizeInput(
 
   // Rate limit check
   if (checkRateLimit(safeSource)) {
+    logger.warn("input_blocked_rate_limit", { source: safeSource, limit: RATE_LIMIT_MAX });
     return {
       content: `[BLOCKED: Rate limit exceeded for ${safeSource}]`,
       blocked: true,
@@ -202,6 +207,10 @@ export function sanitizeInput(
   const threatLevel = computeThreatLevel(checks);
 
   if (threatLevel === "critical") {
+    logger.warn("injection_blocked_critical", {
+      source: safeSource,
+      checks: checks.filter(c => c.detected).map(c => c.name),
+    });
     return {
       content: `[BLOCKED: Message from ${safeSource} contained injection attempt]`,
       blocked: true,
@@ -211,6 +220,10 @@ export function sanitizeInput(
   }
 
   if (threatLevel === "high") {
+    logger.warn("injection_high_threat", {
+      source: safeSource,
+      checks: checks.filter(c => c.detected).map(c => c.name),
+    });
     const escaped = escapePromptBoundaries(stripChatMLMarkers(raw));
     return {
       content:

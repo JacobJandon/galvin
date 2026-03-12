@@ -16,6 +16,9 @@ import type {
 } from "../types.js";
 import { DEFAULT_TOKEN_BUDGET } from "../types.js";
 import { createTokenCounter } from "../memory/context-manager.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("agent.context");
 
 const MAX_CONTEXT_TURNS = 20;
 const SUMMARY_THRESHOLD = 15;
@@ -244,6 +247,7 @@ export function trimContext(
     return turns;
   }
 
+  logger.debug("context_trimmed", { from: turns.length, to: maxTurns });
   // Keep the most recent turns
   return turns.slice(-maxTurns);
 }
@@ -321,6 +325,7 @@ export async function summarizeTurns(
 
   // For many turns, use inference to create a summary
   try {
+    logger.info("context_summarize", { turns: turns.length });
     const response = await inference.chat([
       {
         role: "system",

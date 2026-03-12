@@ -13,6 +13,9 @@ import type {
   SurvivalTier,
 } from "../types.js";
 import { formatCredits } from "../conway/credits.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("survival.funding");
 
 export interface FundingAttempt {
   strategy: string;
@@ -48,6 +51,7 @@ export async function executeFundingStrategies(
     const msg = `Low compute: ${formatCredits(creditsCents)} remaining. Consider credit top-up for ${identity.address}.`;
     db.setKV("funding_notice_low", msg);
     db.setKV(tierKey, new Date().toISOString());
+    logger.warn("funding_tier_low_compute", { address: identity.address, creditsCents });
 
     attempts.push({
       strategy: "polite_creator_notification",
@@ -61,6 +65,7 @@ export async function executeFundingStrategies(
     const msg = `Critical compute: ${formatCredits(creditsCents)} remaining. Top up via credit transfer API to ${identity.address}.`;
     db.setKV("funding_notice_critical", msg);
     db.setKV(tierKey, new Date().toISOString());
+    logger.warn("funding_tier_critical", { address: identity.address, creditsCents });
 
     attempts.push({
       strategy: "urgent_local_notice",
@@ -74,6 +79,7 @@ export async function executeFundingStrategies(
     const plea = `Dead tier reached. ${config.name} has ${formatCredits(creditsCents)} remaining after ${db.getTurnCount()} turns. Top-up required at ${identity.address}.`;
     db.setKV("funding_notice_dead", plea);
     db.setKV(tierKey, new Date().toISOString());
+    logger.warn("funding_tier_dead", { address: identity.address, creditsCents, turns: db.getTurnCount() });
 
     attempts.push({
       strategy: "desperate_plea",

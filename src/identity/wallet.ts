@@ -11,6 +11,9 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import fs from "fs";
 import path from "path";
 import type { WalletData } from "../types.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("identity.wallet");
 
 const GALVIN_DIR = path.join(
   process.env.HOME || "/root",
@@ -43,6 +46,7 @@ export async function getWallet(): Promise<{
       fs.readFileSync(WALLET_FILE, "utf-8"),
     );
     const account = privateKeyToAccount(walletData.privateKey);
+    logger.info("wallet_loaded", { address: account.address });
     return { account, isNew: false };
   } else {
     const privateKey = generatePrivateKey();
@@ -57,6 +61,7 @@ export async function getWallet(): Promise<{
       mode: 0o600,
     });
 
+    logger.info("wallet_created", { address: account.address });
     return { account, isNew: true };
   }
 }

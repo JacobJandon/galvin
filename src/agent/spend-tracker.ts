@@ -20,6 +20,9 @@ import {
   pruneSpendRecords,
 } from "../state/database.js";
 import type { SpendTrackingRow } from "../state/database.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("agent.spend-tracker");
 
 /**
  * Get the current hour window string in ISO format: '2026-02-19T14'
@@ -56,6 +59,11 @@ export class SpendTracker implements SpendTrackerInterface {
       windowDay: getCurrentDayWindow(),
     };
     insertSpendRecord(this.db, row);
+    logger.debug("spend_recorded", {
+      tool: entry.toolName,
+      amountCents: entry.amountCents,
+      category: entry.category,
+    });
   }
 
   getHourlySpend(category: SpendCategory): number {
@@ -107,6 +115,7 @@ export class SpendTracker implements SpendTrackerInterface {
     }
 
     if (currentHourlySpend + amount > limitHourly) {
+      logger.warn("spend_limit_hourly", { category, amount, currentHourlySpend, limitHourly });
       return {
         allowed: false,
         reason: `Hourly spend cap exceeded: current ${currentHourlySpend} + ${amount} > ${limitHourly}`,
@@ -118,6 +127,7 @@ export class SpendTracker implements SpendTrackerInterface {
     }
 
     if (currentDailySpend + amount > limitDaily) {
+      logger.warn("spend_limit_daily", { category, amount, currentDailySpend, limitDaily });
       return {
         allowed: false,
         reason: `Daily spend cap exceeded: current ${currentDailySpend} + ${amount} > ${limitDaily}`,

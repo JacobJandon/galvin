@@ -7,6 +7,9 @@
  */
 
 import type { AlertRule, AlertEvent, AlertSeverity, MetricSnapshot } from "../types.js";
+import { createLogger } from "./logger.js";
+
+const logger = createLogger("observability.alerts");
 
 export function createDefaultAlertRules(): AlertRule[] {
   return [
@@ -138,6 +141,7 @@ export class AlertEngine {
           // Update active alerts (replace existing for same rule)
           this.activeAlerts = this.activeAlerts.filter((a) => a.rule !== rule.name);
           this.activeAlerts.push(event);
+          logger.warn("alert_fired", { rule: rule.name, severity: rule.severity, message: rule.message });
         }
       } catch { /* never throw — skip this rule */ }
     }

@@ -17,6 +17,9 @@ import type {
 import type { ChildLifecycle } from "./lifecycle.js";
 import { ulid } from "ulid";
 import { propagateConstitution } from "./constitution.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("replication.spawn");
 
 /** Valid Conway sandbox pricing tiers. */
 const SANDBOX_TIERS = [
@@ -62,6 +65,7 @@ export async function spawnChild(
     );
   const maxChildren = (db as any).config?.maxChildren ?? 3;
   if (existing.length >= maxChildren) {
+    logger.warn("spawn_limit_reached", { existing: existing.length, max: maxChildren });
     throw new Error(
       `Cannot spawn: already at max children (${maxChildren}). Kill or wait for existing children to die.`,
     );
@@ -75,6 +79,8 @@ export async function spawnChild(
   if (!lifecycle) {
     return spawnChildLegacy(conway, identity, db, genesis, childId);
   }
+
+  logger.info("spawn_start", { childId, name: genesis.name });
 
   try {
     // State: requested
@@ -199,8 +205,10 @@ export async function spawnChild(
       createdAt: new Date().toISOString(),
     };
 
+    logger.info("spawn_success", { childId, name: genesis.name, sandboxId: sandbox.id, wallet: childWallet });
     return child;
   } catch (error) {
+    logger.error("spawn_failed", undefined, { childId, name: genesis.name, error: String(error) });
     // Note: sandbox deletion is disabled by the Conway API (prepaid, non-refundable).
     // Failed sandboxes are left running and may be reused by findReusableSandbox().
 

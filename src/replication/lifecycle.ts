@@ -16,6 +16,9 @@ import {
   getChildrenByStatus,
   updateChildStatus as dbUpdateChildStatus,
 } from "../state/database.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("replication.lifecycle");
 
 export class ChildLifecycle {
   constructor(private db: DatabaseType) {}
@@ -42,6 +45,7 @@ export class ChildLifecycle {
     };
     lifecycleInsertEvent(this.db, event);
     dbUpdateChildStatus(this.db, childId, "requested");
+    logger.info("child_initialized", { childId, name });
   }
 
   /**
@@ -53,6 +57,7 @@ export class ChildLifecycle {
     const allowed = VALID_TRANSITIONS[current];
 
     if (!allowed || !allowed.includes(toState)) {
+      logger.error("lifecycle_invalid_transition", undefined, { childId, from: current, to: toState });
       throw new Error(`Invalid lifecycle transition: ${current} → ${toState}`);
     }
 
@@ -70,6 +75,7 @@ export class ChildLifecycle {
 
     // Update children table
     dbUpdateChildStatus(this.db, childId, toState);
+    logger.info("lifecycle_transition", { childId, from: current, to: toState, reason });
   }
 
   /**

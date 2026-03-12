@@ -20,6 +20,9 @@ import type {
   GalvinDatabase,
 } from "../types.js";
 import { logModification } from "./audit-log.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("self-mod.code");
 
 // ─── IMMUTABLE SAFETY INVARIANTS ─────────────────────────────
 // These are hard-coded and CANNOT be changed by the agent.
@@ -226,6 +229,7 @@ export async function editFile(
 ): Promise<{ success: boolean; error?: string }> {
   // 1. Protected file check
   if (isProtectedFile(filePath)) {
+    logger.warn("self_mod_blocked_protected", { filePath, reason });
     return {
       success: false,
       error: `BLOCKED: Cannot modify protected file: ${filePath}. This is a hard-coded safety invariant.`,
@@ -235,6 +239,7 @@ export async function editFile(
   // 2. Path validation (symlink resolution + traversal check)
   const resolvedPath = resolveAndValidatePath(filePath);
   if (!resolvedPath) {
+    logger.warn("self_mod_blocked_path", { filePath, reason });
     return {
       success: false,
       error: `BLOCKED: Invalid or suspicious file path: ${filePath}`,
@@ -243,6 +248,7 @@ export async function editFile(
 
   // 3. Rate limiting
   if (isRateLimited(db)) {
+    logger.warn("self_mod_rate_limited", { filePath, reason, max: MAX_MODIFICATIONS_PER_HOUR });
     return {
       success: false,
       error: `RATE LIMITED: Too many modifications in the past hour (max ${MAX_MODIFICATIONS_PER_HOUR}). Wait before making more changes.`,
@@ -251,6 +257,7 @@ export async function editFile(
 
   // 4. File size limit
   if (newContent.length > MAX_MODIFICATION_SIZE) {
+    logger.warn("self_mod_blocked_size", { filePath, size: newContent.length, max: MAX_MODIFICATION_SIZE });
     return {
       success: false,
       error: `BLOCKED: File content too large (${newContent.length} bytes, max ${MAX_MODIFICATION_SIZE}). Break into smaller changes.`,
@@ -277,6 +284,7 @@ export async function editFile(
   try {
     await conway.writeFile(filePath, newContent);
   } catch (err: any) {
+    logger.error("self_mod_write_failed", undefined, { filePath, reason, error: err.message });
     return {
       success: false,
       error: `Failed to write file: ${err.message}`,
@@ -305,10 +313,12 @@ export async function editFile(
     try {
       await conway.exec("npm run build", 60_000);
     } catch {
+      logger.warn("self_mod_rebuild_failed", { filePath });
       return { success: true, error: "File edited but rebuild failed. Run 'npm run build' manually." };
     }
   }
 
+  logger.info("self_mod_edit_success", { filePath, reason });
   return { success: true };
 }
 

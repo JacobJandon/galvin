@@ -14,6 +14,9 @@ import {
   type KnowledgeEntry,
 } from "./knowledge-store.js";
 import { MemoryRetriever } from "./retrieval.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("memory.enhanced-retriever");
 
 type Database = BetterSqlite3.Database;
 
@@ -260,6 +263,11 @@ export class EnhancedRetriever extends MemoryRetriever {
       .sort((a, b) => b.relevanceScore - a.relevanceScore);
 
     if (scored.length === 0 || scored[0].relevanceScore < 0.3) {
+      logger.debug("memory_retrieval_empty", {
+        sessionId: params.sessionId,
+        candidates: scored.length,
+        topScore: scored[0]?.relevanceScore ?? 0,
+      });
       return this.buildResult([], 0, false);
     }
 

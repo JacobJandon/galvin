@@ -27,6 +27,9 @@ import { ulid } from "ulid";
 import { keccak256, toHex } from "viem";
 import type { Address, PrivateKeyAccount } from "viem";
 import { randomUUID } from "crypto";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("conway.client");
 
 interface ConwayClientOptions {
   apiUrl: string;
@@ -63,12 +66,14 @@ export function createConwayClient(options: ConwayClientOptions): ConwayClient {
       });
 
       if (resp.status === 404 && attempt < max404Retries) {
+        logger.warn("conway_404_retry", { method, path, attempt });
         await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
         continue;
       }
 
       if (!resp.ok) {
         const text = await resp.text();
+        logger.warn("conway_api_error", { method, path, status: resp.status });
         const err: any = new Error(
           `Conway API error: ${method} ${path} -> ${resp.status}: ${text}`,
         );

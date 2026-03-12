@@ -13,6 +13,9 @@ import { SiweMessage } from "siwe";
 import { getWallet, getGalvinDir } from "./wallet.js";
 import type { ProvisionResult } from "../types.js";
 import { ResilientHttpClient } from "../conway/http-client.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("identity.provision");
 
 const httpClient = new ResilientHttpClient();
 
@@ -68,6 +71,7 @@ export async function provision(
   // 1. Load wallet
   const { account } = await getWallet();
   const address = account.address;
+  logger.info("provision_start", { address, url });
 
   // 2. Get nonce
   const nonceResp = await httpClient.request(`${url}/v1/auth/nonce`, {
@@ -136,6 +140,7 @@ export async function provision(
 
   // 6. Save to config
   saveConfig(key, address);
+  logger.info("provision_complete", { address, keyPrefix: key_prefix });
 
   return { apiKey: key, walletAddress: address, keyPrefix: key_prefix };
 }

@@ -19,6 +19,9 @@ import type {
 } from "../types.js";
 import { insertPolicyDecision } from "../state/database.js";
 import type { PolicyDecisionRow } from "../state/database.js";
+import { createLogger } from "../observability/logger.js";
+
+const logger = createLogger("agent.policy-engine");
 
 export class PolicyEngine {
   private db: Database.Database;
@@ -59,6 +62,13 @@ export class PolicyEngine {
         overallAction = "deny";
         reasonCode = result.reasonCode;
         humanMessage = result.humanMessage;
+        logger.warn("policy_deny", {
+          tool: request.tool.name,
+          rule: result.rule,
+          reasonCode: result.reasonCode,
+          humanMessage: result.humanMessage,
+          inputSource: request.turnContext.inputSource,
+        });
         break; // First deny wins
       }
 
@@ -66,6 +76,12 @@ export class PolicyEngine {
         overallAction = "quarantine";
         reasonCode = result.reasonCode;
         humanMessage = result.humanMessage;
+        logger.warn("policy_quarantine", {
+          tool: request.tool.name,
+          rule: result.rule,
+          reasonCode: result.reasonCode,
+          inputSource: request.turnContext.inputSource,
+        });
       }
     }
 
@@ -90,6 +106,15 @@ export class PolicyEngine {
       timestamp: new Date().toISOString(),
     };
 
+    logger.debug("policy_evaluate", {
+      tool: request.tool.name,
+      action: overallAction,
+      riskLevel: request.tool.riskLevel,
+      rulesEvaluated: rulesEvaluated.length,
+      rulesTriggered: rulesTriggered.length,
+      latencyMs: Date.now() - startTime,
+    });
+
     return decision;
   }
 
@@ -112,8 +137,9 @@ export class PolicyEngine {
 
     try {
       insertPolicyDecision(this.db, row);
-    } catch {
+    } catch (err) {
       // Don't let logging failures block tool execution
+      logger.warn("policy_log_db_error", { error: String(err) });
     }
   }
 
