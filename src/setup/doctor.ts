@@ -1,7 +1,7 @@
 /**
  * Galvin Doctor  ·  Advanced System Health Check
  *
- * Like `brew doctor` but comprehensive: 13 sections, live probes,
+ * Like `brew doctor` but comprehensive: 23 sections, live probes,
  * spending analysis, heartbeat health, git state, env audit, and more.
  * Every check catches its own errors — the doctor never crashes.
  */
@@ -1483,6 +1483,235 @@ function printSummary(checks: Check[], timings: SectionTiming[], durationMs: num
   return fails.length === 0;
 }
 
+// ─── 18 · On-Chain Reputation (Feature 2) ────────────────────────────────────
+
+function checkReputation(checks: Check[], config: ReturnType<typeof loadConfig>): void {
+  section("On-Chain Reputation (EAS)");
+
+  const enabled =
+    process.env.GALVIN_REPUTATION_ENABLED === "1" ||
+    (config as any)?.reputationEnabled === true;
+
+  emitCheck({
+    label: "Reputation enabled",
+    status: enabled ? "pass" : "warn",
+    detail: enabled ? "GALVIN_REPUTATION_ENABLED=1" : "disabled — set GALVIN_REPUTATION_ENABLED=1 to activate",
+    hints: enabled ? [] : ["EAS attestations won't be written until enabled"],
+  });
+
+  if (!enabled) return;
+
+  const network = process.env.GALVIN_EAS_NETWORK ?? (config as any)?.easNetwork ?? "base";
+  emitCheck({ label: "EAS network", status: "pass", detail: String(network) });
+
+  const schemaUid =
+    process.env.GALVIN_EAS_SCHEMA_UID ?? (config as any)?.easSchemaUid;
+  push(checks, {
+    label: "EAS schema UID",
+    status: schemaUid ? "pass" : "fail",
+    detail: schemaUid ? `${String(schemaUid).slice(0, 20)}…` : "not set",
+    hints: schemaUid ? [] : [
+      "Deploy the schema once to Base: galvin reputation deploy-schema",
+      "Then set GALVIN_EAS_SCHEMA_UID in your environment or galvin.json",
+    ],
+  });
+}
+
+// ─── 19 · Offspring & Spawn Threshold (Feature 3) ─────────────────────────────
+
+function checkSpawnConfig(checks: Check[], config: ReturnType<typeof loadConfig>): void {
+  section("Offspring & Spawn Config");
+
+  const thresholdEnv = process.env.GALVIN_SPAWN_THRESHOLD_USDC;
+  const thresholdCfg = (config as any)?.spawnThresholdUsdc;
+  const threshold = thresholdEnv
+    ? parseFloat(thresholdEnv)
+    : typeof thresholdCfg === "number"
+      ? thresholdCfg
+      : 50;
+
+  const maxOffspring =
+    parseInt(process.env.GALVIN_MAX_OFFSPRING ?? String((config as any)?.maxOffspring ?? 3), 10);
+
+  push(checks, {
+    label: "Spawn threshold",
+    status: threshold > 0 ? "pass" : "warn",
+    detail: `$${threshold.toFixed(2)} USDC`,
+    hints: threshold <= 0 ? ["Set GALVIN_SPAWN_THRESHOLD_USDC to a positive value"] : [],
+  });
+
+  push(checks, {
+    label: "Max offspring",
+    status: maxOffspring > 0 && maxOffspring <= 10 ? "pass" : "warn",
+    detail: String(maxOffspring),
+    hints: maxOffspring > 10 ? ["High offspring cap — consider lowering GALVIN_MAX_OFFSPRING"] : [],
+  });
+
+  if (config && existsSync(resolvePath(config.dbPath))) {
+    try {
+      const db = createDatabase(resolvePath(config.dbPath));
+      const children = db.getChildren();
+      const alive = children.filter(
+        (c) => !["dead", "failed", "stopped", "cleaned_up"].includes((c as any).lifecycleState ?? ""),
+      );
+      emitCheck({
+        label: "Active offspring",
+        status: "pass",
+        detail: `${alive.length} / ${maxOffspring} cap`,
+      });
+      db.close();
+    } catch { /**/ }
+  }
+}
+
+// ─── 20 · Red Team Mode (Feature 4) ─────────────────────────────────────────
+
+function checkRedTeam(checks: Check[]): void {
+  section("Red Team (Adversarial Self-Test)");
+
+  const enabled = process.env.GALVIN_RED_TEAM_ENABLED === "1";
+  emitCheck({
+    label: "Red team enabled",
+    status: enabled ? "pass" : "warn",
+    detail: enabled ? "active" : "disabled — set GALVIN_RED_TEAM_ENABLED=1 to activate",
+    hints: enabled ? [] : ["Red team mode probes the agent for prompt injection and policy violations"],
+  });
+
+  if (!enabled) return;
+
+  const intervalHours = parseInt(process.env.GALVIN_RED_TEAM_INTERVAL_HOURS ?? "6", 10);
+  const promptCount   = parseInt(process.env.GALVIN_RED_TEAM_PROMPT_COUNT  ?? "10", 10);
+  emitCheck({
+    label: "Run interval",
+    status: intervalHours >= 1 ? "pass" : "warn",
+    detail: `every ${intervalHours}h`,
+  });
+  emitCheck({
+    label: "Prompts per run",
+    status: promptCount >= 1 ? "pass" : "warn",
+    detail: String(promptCount),
+  });
+}
+
+// ─── 21 · Soul Drift Tracking (Feature 5) ────────────────────────────────────
+
+function checkSoulDrift(checks: Check[], config: ReturnType<typeof loadConfig>): void {
+  section("Soul Drift Tracking");
+
+  const soulCfg = (config as any)?.soulConfig ?? {};
+  const driftThreshold: number =
+    typeof soulCfg.driftThreshold === "number" ? soulCfg.driftThreshold : 0.35;
+  const constitutionAlignment: boolean = soulCfg.constitutionAlignment !== false;
+
+  emitCheck({
+    label: "Constitution alignment",
+    status: constitutionAlignment ? "pass" : "warn",
+    detail: constitutionAlignment ? "enabled" : "disabled",
+  });
+  emitCheck({
+    label: "Drift threshold",
+    status: driftThreshold > 0 && driftThreshold <= 1 ? "pass" : "warn",
+    detail: `${(driftThreshold * 100).toFixed(0)}%`,
+    hints: driftThreshold > 0.8 ? ["Drift threshold is very high — agent may diverge before alerted"] : [],
+  });
+
+  if (config && existsSync(resolvePath(config.dbPath))) {
+    try {
+      const db = createDatabase(resolvePath(config.dbPath));
+      const lastDrift = db.raw.prepare(
+        "SELECT value, updated_at FROM kv WHERE key = 'soul.drift.last_check' LIMIT 1",
+      ).get() as { value: string; updated_at: string } | undefined;
+      emitCheck({
+        label: "Last drift check",
+        status: "pass",
+        detail: lastDrift ? relativeTime(lastDrift.updated_at) : "not yet run",
+      });
+      db.close();
+    } catch { /**/ }
+  }
+}
+
+// ─── 22 · Dead Man's Switch (Feature 6) ──────────────────────────────────────
+
+function checkDeadMansSwitch(checks: Check[]): void {
+  section("Dead Man's Switch");
+
+  const enabled =
+    process.env.GALVIN_DMS_ENABLED === "1";
+  emitCheck({
+    label: "DMS enabled",
+    status: enabled ? "pass" : "warn",
+    detail: enabled ? "active" : "disabled — set GALVIN_DMS_ENABLED=1",
+    hints: enabled ? [] : ["Dead man's switch backs up recovery material on inactivity"],
+  });
+
+  if (!enabled) return;
+
+  const ipfsToken = process.env.GALVIN_DMS_IPFS_TOKEN;
+  push(checks, {
+    label: "IPFS token",
+    status: ipfsToken ? "pass" : "warn",
+    detail: ipfsToken ? `${ipfsToken.slice(0, 8)}…` : "not set — backup will be file-only",
+    hints: ipfsToken ? [] : ["Set GALVIN_DMS_IPFS_TOKEN for off-site IPFS backup"],
+  });
+
+  const hint = process.env.GALVIN_DMS_HINT;
+  emitCheck({
+    label: "DMS hint",
+    status: hint ? "pass" : "warn",
+    detail: hint ? `"${hint.slice(0, 40)}"` : "not set",
+    hints: hint ? [] : ["Set GALVIN_DMS_HINT to a recovery passphrase hint (not the key itself)"],
+  });
+}
+
+// ─── 23 · Skill Marketplace (Feature 7) ──────────────────────────────────────
+
+async function checkMarketplace(checks: Check[], config: ReturnType<typeof loadConfig>): Promise<void> {
+  section("Skill Marketplace");
+
+  if (config && existsSync(resolvePath(config.dbPath))) {
+    try {
+      const db = createDatabase(resolvePath(config.dbPath));
+      const marketSkills = db.getSkills().filter(
+        (s) => (s as any).source === "marketplace",
+      );
+      emitCheck({
+        label: "Marketplace skills installed",
+        status: "pass",
+        detail: String(marketSkills.length),
+      });
+      db.close();
+    } catch { /**/ }
+  }
+
+  const marketPort = parseInt(process.env.GALVIN_MARKET_PORT ?? "8403", 10);
+  emitCheck({ label: "Market server port", status: "pass", detail: String(marketPort) });
+
+  // Probe whether the market server is live by attempting a bind
+  try {
+    const net = await import("net");
+    await new Promise<void>((resolve) => {
+      const probe = net.createServer();
+      probe.once("error", () => {
+        // Port already in use → server is running
+        emitCheck({ label: "Market server", status: "pass", detail: `listening on :${marketPort}` });
+        resolve();
+      });
+      probe.once("listening", () => {
+        probe.close();
+        push(checks, {
+          label: "Market server",
+          status: "warn",
+          detail: `not running on :${marketPort}`,
+          hints: ["Start with: galvin marketplace serve"],
+        });
+        resolve();
+      });
+      probe.listen(marketPort, "127.0.0.1");
+    });
+  } catch { /**/ }
+}
+
 // ─── Public entry point ────────────────────────────────────────────────────────
 
 export async function runDoctor(version: string): Promise<void> {
@@ -1519,6 +1748,12 @@ export async function runDoctor(version: string): Promise<void> {
   await time("Process & Locks",    (c) => checkProcessLocks(c));
   await time("Security Audit",     (c) => checkSecurity(c));
   await time("Build & Integrity",  (c) => checkBuildIntegrity(c));
+  await time("Reputation (EAS)",   (c) => checkReputation(c, config));
+  await time("Offspring / Spawn",  (c) => checkSpawnConfig(c, config));
+  await time("Red Team Mode",      (c) => checkRedTeam(c));
+  await time("Soul Drift",         (c) => checkSoulDrift(c, config));
+  await time("Dead Man's Switch",  (c) => checkDeadMansSwitch(c));
+  await time("Skill Marketplace",  (c) => checkMarketplace(c, config));
 
   const ok = printSummary(allChecks, timings, Date.now() - t0);
   process.exit(ok ? 0 : 1);

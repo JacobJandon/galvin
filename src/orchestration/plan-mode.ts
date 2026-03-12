@@ -241,6 +241,7 @@ export async function loadPlan(planFilePath: string): Promise<PlannerOutput> {
 export async function reviewPlan(
   plan: PlannerOutput,
   config: PlanApprovalConfig,
+  inference?: UnifiedInferenceClient,
 ): Promise<{ approved: boolean; feedback?: string }> {
   const normalized = normalizeApprovalConfig(config);
 
@@ -260,15 +261,109 @@ export async function reviewPlan(
     }
 
     case "consensus": {
-      return {
-        approved: true,
-        feedback: `Consensus review stub (critic role '${normalized.consensusCriticRole}', timeout ${normalized.reviewTimeoutMs}ms).`,
-      };
+      return consensusReview(plan, normalized, inference);
     }
 
     default: {
       return { approved: false, feedback: "Unsupported review mode." };
     }
+  }
+}
+
+/**
+ * Critic-LLM consensus review.
+ * Uses the inference client to play a skeptical reviewer against the plan.
+ * If the inference client is unavailable the review auto-approves with a note.
+ */
+async function consensusReview(
+  plan: PlannerOutput,
+  config: ReturnType<typeof normalizeApprovalConfig>,
+  inference: UnifiedInferenceClient | undefined,
+): Promise<{ approved: boolean; feedback: string }> {
+  if (!inference) {
+    return {
+      approved: true,
+      feedback: `Consensus review skipped — no inference client provided (critic role '${config.consensusCriticRole}').`,
+    };
+  }
+
+  const planSummary = JSON.stringify(
+    {
+      strategy: plan.strategy,
+      estimatedTotalCostCents: plan.estimatedTotalCostCents,
+      estimatedTimeMinutes: plan.estimatedTimeMinutes,
+      risks: plan.risks,
+      tasks: plan.tasks.map((t) => ({
+        title: t.title,
+        agentRole: t.agentRole,
+        dependencies: t.dependencies,
+        estimatedCostCents: t.estimatedCostCents,
+      })),
+    },
+    null,
+    2,
+  );
+
+  const timeoutMs = Math.min(config.reviewTimeoutMs, 60_000);
+
+  try {
+    const result = await Promise.race([
+      inference.chat({
+        tier: "cheap",
+        maxTokens: 400,
+        responseFormat: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content: [
+              `You are a critical plan reviewer with the role: '${config.consensusCriticRole}'.`,
+              "Review the following agent execution plan and return strict JSON with keys:",
+              "  approved (boolean): true if the plan is safe and sensible, false if it should be rejected.",
+              "  feedback (string): concise critique or approval reason (max 2 sentences).",
+              "  risks (string[]): up to 3 key risks identified.",
+              "Be conservative: reject plans with unbounded cost, circular dependencies, or missing required data.",
+              "No markdown. No extra keys.",
+            ].join(" "),
+          },
+          {
+            role: "user",
+            content: `Plan to review:\n${planSummary}`,
+          },
+        ],
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("consensus_timeout")), timeoutMs),
+      ),
+    ]);
+
+    const parsed = safeJsonParse(result.content);
+    const approved = parsed?.approved !== false; // default approve on unexpected shape
+    const feedback =
+      typeof parsed?.feedback === "string" && parsed.feedback.trim().length > 0
+        ? parsed.feedback.trim()
+        : approved
+          ? "Plan approved by consensus reviewer."
+          : "Plan rejected by consensus reviewer.";
+    const risks: string[] =
+      Array.isArray(parsed?.risks) && parsed.risks.every((r: unknown) => typeof r === "string")
+        ? (parsed.risks as string[]).slice(0, 3)
+        : [];
+
+    const riskNote = risks.length > 0 ? `  Risks: ${risks.join("; ")}` : "";
+    return { approved, feedback: `${feedback}${riskNote}` };
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    if (err.message === "consensus_timeout") {
+      return {
+        approved: false,
+        feedback: `Consensus review timed out after ${timeoutMs}ms — plan rejected to be safe.`,
+      };
+    }
+    // Inference error — fail open with a warning
+    return {
+      approved: true,
+      feedback: `Consensus reviewer unavailable (${err.message}) — auto-approved with caution.`,
+    };
   }
 }
 

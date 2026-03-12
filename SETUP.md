@@ -104,6 +104,25 @@ Financial safety limits. Press Enter to accept sensible defaults:
 | Max daily inference | 5000 cents ($50) | Daily inference budget |
 | Confirmation threshold | 1000 cents ($10) | Ask before big spends |
 
+### Step 3/6 (continued) — On-Chain Reputation (EAS)
+
+Galvin can write verifiable attestations to Base after every task. This is opt-in and costs a tiny amount of gas per task.
+
+```
+Enable EAS attestations? (y to enable, Enter to skip) >
+EAS schema UID (0x..., or Enter to deploy later) >
+```
+
+Deploy the schema once after setup: `galvin reputation deploy-schema`
+
+### Step 3/6 (continued) — Offspring / Spawn Threshold
+
+Galvin automatically spawns child copies when its USDC reserve crosses this threshold.
+
+```
+Spawn threshold in USDC (default 50, Enter to skip) > 50
+```
+
 ### Step 4/6 — Environment Detection
 
 Galvin detects whether it's in a Conway sandbox or running locally.

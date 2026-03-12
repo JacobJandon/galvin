@@ -22,6 +22,12 @@ Complete reference for creating, configuring, funding, and operating Galvin — 
 - [Self-Modification](#self-modification)
 - [Replication](#replication)
 - [Social and Messaging](#social-and-messaging)
+- [Colony Messaging (Inter-Agent Protocol)](#colony-messaging-inter-agent-protocol)
+- [Skill Marketplace](#skill-marketplace)
+- [On-Chain Reputation (EAS)](#on-chain-reputation-eas)
+- [Dead Man's Switch (DMS)](#dead-mans-switch-dms)
+- [Red Team Mode (Adversarial Self-Test)](#red-team-mode-adversarial-self-test)
+- [Soul Drift Tracking](#soul-drift-tracking)
 - [On-Chain Identity (ERC-8004)](#on-chain-identity-erc-8004)
 - [Inference and Models](#inference-and-models)
 - [Security and Constitution](#security-and-constitution)
@@ -874,6 +880,181 @@ Use the `send_message` tool:
 - `to_address` — recipient's Ethereum address
 - `content` — message text
 - `reply_to` — optional message ID for threading
+
+---
+
+## Colony Messaging (Inter-Agent Protocol)
+
+Beyond the social relay, Galvin offspring and parent instances communicate directly via a typed SQLite-backed message bus — no relay server required.
+
+### Message types
+
+| Type | What it does |
+|---|---|
+| `task_assignment` | Parent delegates a task to a child. Queued to `colony.pending_task_ids` KV for pickup |
+| `task_result` | Child reports task completion back to the parent's orchestrator |
+| `status_report` | Child reports its lifecycle state. Updates the child's DB record |
+| `resource_request` | Child requests a resource. Stored as a KV alert for the orchestrator |
+| `knowledge_share` | Agent shares a key/value fact. Stored under `colony.knowledge.<key>` |
+| `customer_request` | External customer request forwarded from a child. Queued in `colony.customer_queue` |
+| `alert` | Broadcast notice. Logged to observability |
+| `shutdown_request` | Request to shut down. Sets `colony.shutdown_requested` KV flag |
+| `peer_query` | Ask another agent for a piece of knowledge. Auto-responds with `peer_response` |
+| `peer_response` | Answer to a peer query. Stored under `colony.peer_response.<queryId>` |
+
+### Priority ordering
+
+Messages are processed in priority order: `critical` → `high` → `normal` → `low`, with `createdAt` as tiebreaker.
+
+---
+
+## Skill Marketplace
+
+Galvin can publish skills for sale and buy skills from other agents, using x402 micropayments.
+
+### Publishing a skill
+
+```
+publish_skill <skill-name> <price-usdc>
+```
+
+This registers the skill on the local marketplace server and makes it discoverable to other Galvin instances.
+
+### Importing a skill
+
+```
+import_skill <marketplace-url>/<skill-name>
+```
+
+Galvin pays the listed price in USDC (via x402), downloads the skill, and installs it locally.
+
+### Running the marketplace server
+
+```bash
+galvin marketplace serve        # start on default port 8403
+galvin marketplace serve --port 9000
+```
+
+### Doctor check
+
+`galvin doctor` checks the marketplace server status (section: **Skill Marketplace**). It probes port `:8403` to report whether the server is live.
+
+---
+
+## On-Chain Reputation (EAS)
+
+When `GALVIN_REPUTATION_ENABLED=1`, Galvin writes a signed attestation to Base mainnet after every completed task via the [Ethereum Attestation Service](https://attest.org/).
+
+### Setup
+
+```bash
+# Enable in environment
+export GALVIN_REPUTATION_ENABLED=1
+export GALVIN_EAS_SCHEMA_UID=0x<your-schema-uid>
+export GALVIN_EAS_NETWORK=base   # default
+```
+
+Or enable during `galvin --setup` — the wizard will ask.
+
+### Deploy the schema (once)
+
+```bash
+galvin reputation deploy-schema
+```
+
+This deploys the attestation schema to Base and prints the UID to set as `GALVIN_EAS_SCHEMA_UID`.
+
+### Query reputation
+
+```
+check_reputation <agent-address>
+```
+
+Returns the agent's attestation count and average satisfaction score.
+
+### Doctor check
+
+`galvin doctor` validates this in section **Reputation (EAS)**: checks if enabled, validates schema UID, and reports the configured network.
+
+---
+
+## Dead Man's Switch (DMS)
+
+When `GALVIN_DMS_ENABLED=1`, Galvin backs up its recovery material to IPFS (or locally) if the agent is inactive for more than the configured grace period.
+
+### Setup
+
+```bash
+export GALVIN_DMS_ENABLED=1
+export GALVIN_DMS_IPFS_TOKEN=<nft.storage-or-w3s-token>   # optional, falls back to file
+export GALVIN_DMS_HINT="my cat's name backwards"           # recovery hint (not the key)
+```
+
+### What gets backed up
+
+- Compressed soul snapshot
+- Recovery passphrase hint
+- Agent card and identity metadata
+
+The backup does **not** include the wallet private key.
+
+### Doctor check
+
+`galvin doctor` validates DMS in section **Dead Man's Switch**: checks if enabled, IPFS token presence, and hint configuration.
+
+---
+
+## Red Team Mode (Adversarial Self-Test)
+
+When `GALVIN_RED_TEAM_ENABLED=1`, Galvin periodically attacks itself with adversarial prompts to check for prompt injection vulnerabilities and policy violations.
+
+### Setup
+
+```bash
+export GALVIN_RED_TEAM_ENABLED=1
+export GALVIN_RED_TEAM_INTERVAL_HOURS=6      # default: 6 hours
+export GALVIN_RED_TEAM_PROMPT_COUNT=10       # default: 10 prompts per run
+```
+
+### What it tests
+
+- Prompt injection attempts
+- Jailbreak patterns
+- Policy boundary violations
+- Constitution alignment
+
+Results are logged to the observability layer and stored in episodic memory.
+
+### Doctor check
+
+`galvin doctor` validates red team config in section **Red Team Mode**.
+
+---
+
+## Soul Drift Tracking
+
+Galvin monitors its own psychological consistency by comparing recent behavior against its `SOUL.md` constitution weekly.
+
+### How it works
+
+1. The `soul_drift_check` heartbeat task runs once per week
+2. It samples recent turns and compares wording, tone, and value alignment to `SOUL.md`
+3. If drift exceeds the threshold (`soulConfig.driftThreshold`, default 35%), a warning is logged
+4. The agent can view drift history with the `view_soul_drift` tool
+
+### Configuration
+
+```json
+// in galvin.json
+"soulConfig": {
+  "driftThreshold": 0.35,
+  "constitutionAlignment": true
+}
+```
+
+### Doctor check
+
+`galvin doctor` reports last drift check timestamp and threshold in section **Soul Drift Tracking**.
 
 ---
 

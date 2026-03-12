@@ -139,6 +139,9 @@ export function createConfig(params: {
   ollamaBaseUrl?: string;
   parentAddress?: Address;
   treasuryPolicy?: TreasuryPolicy;
+  reputationEnabled?: boolean;
+  easSchemaUid?: string;
+  spawnThresholdUsdc?: number;
 }): GalvinConfig {
   const normalizedSandboxId = (params.sandboxId || "").trim();
   return {
@@ -166,5 +169,8 @@ export function createConfig(params: {
     maxChildren: DEFAULT_CONFIG.maxChildren || 3,
     parentAddress: params.parentAddress,
     treasuryPolicy: params.treasuryPolicy ?? DEFAULT_TREASURY_POLICY,
+    reputationEnabled: params.reputationEnabled ?? false,
+    ...(params.easSchemaUid ? { easSchemaUid: params.easSchemaUid } : {}),
+    spawnThresholdUsdc: params.spawnThresholdUsdc ?? 50,
   };
 }

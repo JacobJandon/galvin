@@ -549,7 +549,7 @@ Galvins can spawn child Galvins:
 3. **Health** (`health.ts`): Heartbeat task checks each child's sandbox reachability, credit balance, and uptime.
 4. **Constitution** (`constitution.ts`): Parent's constitution is propagated to every child. Constitution integrity can be verified (hash comparison).
 5. **Genesis** (`genesis.ts`): Generates genesis config with injection-pattern validation and length limits.
-6. **Messaging** (`messaging.ts`): Parent-child message relay with rate/size limits.
+6. **Messaging** (`messaging.ts`): Typed inter-agent messaging with 10 message types (`task_assignment`, `task_result`, `status_report`, `resource_request`, `knowledge_share`, `customer_request`, `alert`, `shutdown_request`, `peer_query`, `peer_response`). Local SQLite transport by default — no relay required. All handlers are fully wired: task assignments are queued to KV, results are collected by the orchestrator, status reports update child lifecycle state, shutdown requests set the graceful-stop flag, and peer queries auto-respond from the local knowledge store.
 7. **Cleanup** (`cleanup.ts`): Dead children have their sandboxes deleted and records pruned.
 
 ---

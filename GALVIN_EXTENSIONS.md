@@ -58,7 +58,7 @@ automaton has a minimal `showBanner()`. Galvin replaces it entirely with:
 ---
 
 ### `src/setup/doctor.ts`
-automaton has a basic `check()` with ~5 checks. Galvin's doctor has **17 sections**:
+automaton has a basic `check()` with ~5 checks. Galvin's doctor has **23 sections**:
 
 1. Node & Runtime  
 2. Environment Variables  
@@ -77,6 +77,12 @@ automaton has a basic `check()` with ~5 checks. Galvin's doctor has **17 section
 15. Process & lock files  
 16. Security audit  
 17. Build & binary integrity  
+18. On-Chain Reputation (EAS) — validates `GALVIN_REPUTATION_ENABLED`, schema UID, network  
+19. Offspring & Spawn Config — checks spawn threshold, max offspring cap, active child count  
+20. Red Team Mode — validates `GALVIN_RED_TEAM_ENABLED`, interval, prompt count  
+21. Soul Drift Tracking — checks constitution alignment, drift threshold, last check timestamp  
+22. Dead Man's Switch — validates `GALVIN_DMS_ENABLED`, IPFS token, hint passphrase  
+23. Skill Marketplace — checks installed marketplace skills, server port, live probe  
 
 Includes warnings for deprecated env vars, unknown `GALVIN_*` vars, and a backup tip in the summary.
 
@@ -138,7 +144,7 @@ automaton ships a generic constitution template. Galvin's is specific:
 automaton's CLI is minimal. Galvin's CLI adds:
 - `galvin --run` — full boot with banner
 - `galvin setup` — interactive wizard
-- `galvin doctor` — 17-section health check
+- `galvin doctor` — 23-section health check
 - `galvin fund` — show funding QR
 - `galvin status` — live agent status
 - `galvin stop` — graceful shutdown
@@ -180,6 +186,6 @@ These modules are used as-is from automaton (no meaningful Galvin-specific chang
 | Economic model | USDC survival (framework) | USDC survival + x402 earning |
 | Terminal UI | None | MatrixRain + ASCII banner |
 | Channels | Social framework only | Telegram (grammY) |
-| Doctor | ~5 checks | 17 sections |
+| Doctor | ~5 checks | 23 sections |
 | Browser | None | Playwright |
 | Offspring CLI | Basic | `galvin replication` commands |

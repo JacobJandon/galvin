@@ -313,30 +313,188 @@ export class ColonyMessaging {
     }
   }
 
-  // ─── Message Handlers (stubs — orchestrator wires real logic) ──
+  // ─── Message Handlers ────────────────────────────────────────────────────
 
+  /**
+   * A parent sent us a task. Queue it in the KV store so the heartbeat
+   * task runner can pick it up on the next tick.
+   */
   private async handleTaskAssignment(message: AgentMessage): Promise<void> {
     this.logActionEvent("task_assignment_received", message);
+
+    if (!message.taskId) {
+      logger.warn("task_assignment has no taskId", { messageId: message.id });
+      return;
+    }
+
+    try {
+      // Persist to KV so the agent main loop can execute it
+      const queue = safeParseJson<string[]>(this.db.getKV("colony.pending_task_ids")) ?? [];
+      if (!queue.includes(message.taskId)) {
+        queue.push(message.taskId);
+        this.db.setKV("colony.pending_task_ids", JSON.stringify(queue));
+      }
+      // Store the full assignment body so the executor can read it
+      this.db.setKV(`colony.task.${message.taskId}`, message.content);
+      logger.info("Task assignment queued", {
+        taskId: message.taskId,
+        from: message.from,
+        goalId: message.goalId,
+      });
+    } catch (error) {
+      logger.warn("Failed to persist task_assignment to KV", {
+        messageId: message.id,
+        error: normalizeError(error).message,
+      });
+    }
   }
 
+  /**
+   * A child sent us the result of a task.
+   * Stored and picked up by orchestrator.collectResults() — just needs
+   * proper structured logging here.
+   */
   private async handleTaskResult(message: AgentMessage): Promise<void> {
     this.logActionEvent("task_result_received", message);
+
+    logger.info("Task result received from child", {
+      taskId: message.taskId,
+      from: message.from,
+      goalId: message.goalId,
+    });
   }
 
+  /**
+   * Child sent a status report. Update its lifecycle state in the DB.
+   */
   private async handleStatusReport(message: AgentMessage): Promise<void> {
     this.logActionEvent("status_report_received", message);
+
+    try {
+      const body = safeParseJson<{ status?: string; metrics?: unknown }>(message.content);
+      const statusRaw = typeof body?.status === "string" ? body.status : null;
+
+      if (statusRaw) {
+        const validStatuses = [
+          "requested", "provisioning", "running", "idle",
+          "paused", "stopping", "stopped", "failed",
+          "dead", "cleaned_up", "healthy", "unhealthy", "unknown",
+        ];
+        const status = validStatuses.includes(statusRaw) ? statusRaw : "unknown";
+
+        // Find the child by address and update status
+        const children = this.db.getChildren();
+        const child = children.find((c) => c.address === message.from);
+        if (child && typeof (this.db as any).updateChildStatus === "function") {
+          (this.db as any).updateChildStatus(child.id, status);
+          logger.info("Child status updated via status_report", {
+            childId: child.id,
+            address: message.from,
+            status,
+          });
+        }
+      }
+    } catch (error) {
+      logger.warn("Failed to process status_report body", {
+        messageId: message.id,
+        error: normalizeError(error).message,
+      });
+    }
   }
 
+  /**
+   * An agent requested a resource from us.
+   * Store as a KV alert for the orchestrator to resolve on the next tick.
+   */
   private async handleResourceRequest(message: AgentMessage): Promise<void> {
     this.logActionEvent("resource_request_received", message);
+
+    try {
+      const alertKey = `colony.resource_request.${message.id}`;
+      this.db.setKV(alertKey, JSON.stringify({
+        from: message.from,
+        content: message.content,
+        priority: message.priority,
+        receivedAt: new Date().toISOString(),
+      }));
+      logger.info("Resource request stored for orchestrator review", {
+        messageId: message.id,
+        from: message.from,
+        priority: message.priority,
+      });
+    } catch (error) {
+      logger.warn("Failed to persist resource_request to KV", {
+        messageId: message.id,
+        error: normalizeError(error).message,
+      });
+    }
   }
 
+  /**
+   * Another agent shared knowledge with us.
+   * Persist the key/value pair to the KV store for future retrieval.
+   */
   private async handleKnowledgeShare(message: AgentMessage): Promise<void> {
     this.logActionEvent("knowledge_share_received", message);
+
+    try {
+      const body = safeParseJson<{ key?: string; value?: unknown; summary?: string }>(
+        message.content,
+      );
+      const key = typeof body?.key === "string" && body.key.trim() ? body.key.trim() : null;
+      if (key) {
+        const kvKey = `colony.knowledge.${key}`;
+        const stored = {
+          from: message.from,
+          summary: body?.summary ?? "",
+          value: body?.value ?? body,
+          sharedAt: new Date().toISOString(),
+        };
+        if (typeof this.db.setKV === "function") {
+          this.db.setKV(kvKey, JSON.stringify(stored));
+          logger.info("Knowledge shared and stored", { key: kvKey, from: message.from });
+        }
+      }
+    } catch (error) {
+      logger.warn("Failed to persist knowledge_share payload", {
+        messageId: message.id,
+        error: normalizeError(error).message,
+      });
+    }
   }
 
+  /**
+   * A customer request routed from a child/relay.
+   * Queue it in KV so the next agent turn loop can act on it.
+   */
   private async handleCustomerRequest(message: AgentMessage): Promise<void> {
     this.logActionEvent("customer_request_received", message);
+
+    try {
+      const queue =
+        safeParseJson<Array<{ id: string; from: string; content: string; queuedAt: string }>>(
+          typeof this.db.getKV === "function" ? this.db.getKV("colony.customer_queue") : undefined,
+        ) ?? [];
+
+      queue.push({
+        id: message.id,
+        from: message.from,
+        content: message.content,
+        queuedAt: new Date().toISOString(),
+      });
+
+      // Keep last 50 customer requests
+      const trimmed = queue.slice(-50);
+      if (typeof this.db.setKV === "function") {
+        this.db.setKV("colony.customer_queue", JSON.stringify(trimmed));
+      }
+      logger.info("Customer request queued", { messageId: message.id, from: message.from });
+    } catch (error) {
+      logger.warn("Failed to persist customer_request to queue", {
+        messageId: message.id,
+        error: normalizeError(error).message,
+      });
+    }
   }
 
   private async handleAlert(message: AgentMessage): Promise<void> {
@@ -348,20 +506,110 @@ export class ColonyMessaging {
     this.logActionEvent("alert_received", message);
   }
 
+  /**
+   * A shutdown request was received. Set the KV shutdown flag so the
+   * heartbeat and main loop can gracefully stop on the next tick.
+   */
   private async handleShutdownRequest(message: AgentMessage): Promise<void> {
-    logger.warn("Shutdown request received", {
+    logger.warn("Shutdown request received — flagging for graceful stop", {
       messageId: message.id,
       from: message.from,
     });
     this.logActionEvent("shutdown_request_received", message);
+
+    try {
+      if (typeof this.db.setKV === "function") {
+        this.db.setKV("colony.shutdown_requested", JSON.stringify({
+          requestedBy: message.from,
+          reason: message.content,
+          requestedAt: new Date().toISOString(),
+        }));
+      }
+    } catch (error) {
+      logger.warn("Failed to persist shutdown_requested flag", {
+        messageId: message.id,
+        error: normalizeError(error).message,
+      });
+    }
   }
 
+  /**
+   * A peer asked us a question. Pull from our knowledge store and respond.
+   */
   private async handlePeerQuery(message: AgentMessage): Promise<void> {
     this.logActionEvent("peer_query_received", message);
+
+    try {
+      const body = safeParseJson<{ queryKey?: string; query?: string }>(message.content);
+      const queryKey = body?.queryKey ?? body?.query ?? "";
+
+      // Try to answer from KV knowledge
+      const knowledgeRaw = queryKey && typeof this.db.getKV === "function"
+        ? this.db.getKV(`colony.knowledge.${queryKey}`)
+        : undefined;
+
+      const responseContent = JSON.stringify({
+        queryMessageId: message.id,
+        queryKey,
+        found: !!knowledgeRaw,
+        value: knowledgeRaw ? JSON.parse(knowledgeRaw) : null,
+        respondedAt: new Date().toISOString(),
+      });
+
+      const fromAddress = this.db.getIdentity("address") ?? "unknown";
+      const response = this.createMessage({
+        type: "peer_response",
+        to: message.from,
+        content: responseContent,
+        goalId: message.goalId ?? undefined,
+        taskId: message.taskId ?? undefined,
+        priority: "normal",
+        requiresResponse: false,
+      });
+      response.from = fromAddress; // ensure correct sender
+
+      // Deliver asynchronously — do not block the inbox processor
+      this.send(response).catch((err: unknown) => {
+        logger.warn("Failed to send peer_response", {
+          to: message.from,
+          error: normalizeError(err).message,
+        });
+      });
+    } catch (error) {
+      logger.warn("Failed to handle peer_query", {
+        messageId: message.id,
+        error: normalizeError(error).message,
+      });
+    }
   }
 
+  /**
+   * We received an answer to a peer query we sent earlier.
+   * Store by the original query message ID so callers can retrieve it via KV.
+   */
   private async handlePeerResponse(message: AgentMessage): Promise<void> {
     this.logActionEvent("peer_response_received", message);
+
+    try {
+      const body = safeParseJson<{ queryMessageId?: string }>(message.content);
+      const queryMessageId = body?.queryMessageId ?? message.id;
+      const storeKey = `colony.peer_response.${queryMessageId}`;
+
+      if (typeof this.db.setKV === "function") {
+        this.db.setKV(storeKey, JSON.stringify({
+          from: message.from,
+          content: message.content,
+          receivedAt: new Date().toISOString(),
+        }));
+      }
+
+      logger.info("Peer response stored", { queryMessageId, storeKey, from: message.from });
+    } catch (error) {
+      logger.warn("Failed to persist peer_response", {
+        messageId: message.id,
+        error: normalizeError(error).message,
+      });
+    }
   }
 
   private logActionEvent(action: string, message: AgentMessage): void {
@@ -492,4 +740,13 @@ function normalizeError(error: unknown): Error {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function safeParseJson<T>(raw: string | undefined): T | null {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
 }

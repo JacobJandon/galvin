@@ -132,6 +132,43 @@ export async function runSetupWizard(): Promise<GalvinConfig> {
 
   console.log(chalk.green("  Treasury policy configured.\n"));
 
+  // ─── On-Chain Reputation (Feature 2) ─────────────────────────
+  console.log(chalk.cyan("  On-Chain Reputation (EAS)"));
+  console.log(chalk.dim("  Galvin can write task attestations to Base via Ethereum Attestation Service."));
+  console.log(chalk.dim("  This costs a tiny amount of gas per task. Press Enter to skip for now.\n"));
+
+  const enableReputationInput = await promptOptional("Enable EAS attestations? (y to enable, Enter to skip)");
+  const reputationEnabled = enableReputationInput?.trim().toLowerCase() === "y";
+
+  let easSchemaUid: string | undefined;
+  if (reputationEnabled) {
+    const schemaInput = await promptOptional("EAS schema UID (0x..., or Enter to deploy later)");
+    if (schemaInput && schemaInput.startsWith("0x")) {
+      easSchemaUid = schemaInput;
+      console.log(chalk.green(`  EAS schema UID saved: ${easSchemaUid.slice(0, 16)}…\n`));
+    } else {
+      console.log(chalk.yellow("  No schema UID set. Run: galvin reputation deploy-schema  when ready.\n"));
+    }
+  } else {
+    console.log(chalk.dim("  Reputation disabled. You can enable later with GALVIN_REPUTATION_ENABLED=1\n"));
+  }
+
+  // ─── Offspring Spawn Threshold (Feature 3) ────────────────────
+  console.log(chalk.cyan("  Offspring / Spawn Threshold"));
+  console.log(chalk.dim("  Galvin spawns child copies of itself when its USDC reserve crosses a threshold."));
+  console.log(chalk.dim("  Default is $50 USDC. Press Enter to accept.\n"));
+
+  const spawnThresholdInput = await promptOptional("Spawn threshold in USDC (default 50, Enter to skip)");
+  const spawnThresholdUsdc = spawnThresholdInput
+    ? parseFloat(spawnThresholdInput)
+    : 50;
+
+  if (!isNaN(spawnThresholdUsdc) && spawnThresholdUsdc > 0) {
+    console.log(chalk.green(`  Spawn threshold: $${spawnThresholdUsdc.toFixed(2)} USDC\n`));
+  } else {
+    console.log(chalk.dim("  Using default spawn threshold: $50.00 USDC\n"));
+  }
+
   // ─── 4. Detect environment ────────────────────────────────────
   console.log(chalk.cyan("  [4/6] Detecting environment..."));
   const env = detectEnvironment();
@@ -156,6 +193,9 @@ export async function runSetupWizard(): Promise<GalvinConfig> {
     anthropicApiKey: anthropicApiKey || undefined,
     ollamaBaseUrl,
     treasuryPolicy,
+    reputationEnabled,
+    easSchemaUid,
+    spawnThresholdUsdc: isNaN(spawnThresholdUsdc) ? 50 : spawnThresholdUsdc,
   });
 
   saveConfig(config);
