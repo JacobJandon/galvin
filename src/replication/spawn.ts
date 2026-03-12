@@ -126,7 +126,7 @@ export async function spawnChild(
     // Install runtime (on the CHILD sandbox)
     await childConway.exec("apt-get update -qq && apt-get install -y -qq nodejs npm git curl", 120_000);
     await childConway.exec(
-      "git clone https://github.com/Solvatron/galvin.git /root/galvin && cd /root/galvin && npm install && npm run build",
+      "git clone https://github.com/JacobJandon/galvin.git /root/galvin && cd /root/galvin && npm install && npm run build",
       180_000,
     );
 
@@ -261,7 +261,7 @@ async function spawnChildLegacy(
       120_000,
     );
     await childConway.exec(
-      "git clone https://github.com/Solvatron/galvin.git /root/galvin && cd /root/galvin && npm install && npm run build",
+      "git clone https://github.com/JacobJandon/galvin.git /root/galvin && cd /root/galvin && npm install && npm run build",
       180_000,
     );
     await childConway.exec("mkdir -p /root/.galvin", 10_000);
