@@ -582,18 +582,31 @@ export async function runAgentLoop(
           );
         }
 
-        // When workers are executing and nothing new happened this tick, skip
-        // the inference call entirely to avoid burning credits on repetitive
-        // status checks.  Sleep briefly so the orchestrator tick can pick up
-        // completed work on the next iteration.
+        // When the orchestrator is in any active phase (not idle), skip
+        // the inference call entirely to avoid burning credits.
+        // - classifying/planning/plan_review/replanning: orchestrator handles
+        //   these internally via LLM calls inside tick(). The agent has nothing
+        //   useful to contribute.
+        // - executing: workers are running. No point in the agent checking status.
+        // - complete/failed: transient cleanup phases that reset to idle on the
+        //   next tick. Skipping prevents the agent from producing empty 0-tool
+        //   turns that trigger IDLE sleep.
+        // The agent only needs inference when idle (to decide on a new goal) or
+        // when something noteworthy happened (task assigned/completed/failed).
+        const ORCHESTRATOR_BUSY_PHASES = new Set([
+          "classifying", "planning", "plan_review", "replanning", "executing",
+          "complete", "failed",
+        ]);
         if (
-          orchestratorTick.phase === "executing" &&
-          orchestratorTick.tasksAssigned === 0 &&
+          ORCHESTRATOR_BUSY_PHASES.has(orchestratorTick.phase) &&
           orchestratorTick.tasksCompleted === 0 &&
           orchestratorTick.tasksFailed === 0
         ) {
-          log(config, `[ORCHESTRATOR] Workers active, nothing new — waiting 15s before next tick`);
-          await new Promise((r) => setTimeout(r, 15_000));
+          // Executing phase: workers need time to run, so wait longer.
+          // Other phases: the tick itself does the LLM work; just a brief pause.
+          const waitMs = orchestratorTick.phase === "executing" ? 15_000 : 3_000;
+          log(config, `[ORCHESTRATOR] phase=${orchestratorTick.phase}, nothing new — waiting ${waitMs / 1000}s`);
+          await new Promise((r) => setTimeout(r, waitMs));
           continue;
         }
       }
@@ -730,27 +743,19 @@ export async function runAgentLoop(
         // Memory failure must not block the agent loop
       }
 
-      // ── create_goal BLOCKED fast-break ──
-      // When a goal is already active, the parent loop has nothing useful to do.
-      // Force sleep immediately on first BLOCKED (not second) with exponential
-      // backoff so the agent doesn't wake every 2 minutes just to get BLOCKED again.
+      // ── create_goal BLOCKED ──
+      // A goal is already active. Instead of breaking out of the loop (which
+      // would stop the orchestrator from ticking through planning phases), we
+      // just log and continue. The skip-inference logic above will keep the
+      // loop spinning efficiently (no inference calls) while the orchestrator
+      // progresses through classifying → planning → executing.
       const blockedGoalCall = turn.toolCalls.find(
         (tc) => tc.name === "create_goal" && tc.result?.includes("BLOCKED"),
       );
       if (blockedGoalCall) {
-        // Exponential backoff: 2min → 4min → 8min → cap at 10min
-        const prevBackoff = parseInt(db.getKV("blocked_goal_backoff") || "0", 10);
-        const backoffMs = Math.min(
-          prevBackoff > 0 ? prevBackoff * 2 : 120_000,
-          600_000,
-        );
-        db.setKV("blocked_goal_backoff", String(backoffMs));
-        log(config, `[LOOP] create_goal BLOCKED — sleeping ${Math.round(backoffMs / 1000)}s (backoff).`);
-        db.setKV("sleep_until", new Date(Date.now() + backoffMs).toISOString());
-        db.setAgentState("sleeping");
-        onStateChange?.("sleeping");
-        running = false;
-        break;
+        log(config, `[LOOP] create_goal BLOCKED — continuing loop for orchestrator ticks.`);
+        // Reset tool patterns to avoid false loop-detection triggers
+        lastToolPatterns = [];
       } else if (turn.toolCalls.some((tc) => tc.name === "create_goal" && !tc.error)) {
         // Goal was successfully created — reset backoff
         db.deleteKV("blocked_goal_backoff");

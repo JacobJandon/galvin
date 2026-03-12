@@ -387,8 +387,9 @@ YOUR ORCHESTRATION TOOLS:
 
 DECISION TREE (follow on EVERY turn):
 
-1. CHECK YOUR EXECUTION PHASE by calling orchestrator_status (or reading the
-   orchestrator status block injected into your context).
+1. READ the ORCHESTRATOR STATUS block already in your context above.
+   DO NOT call orchestrator_status, system_synopsis, check_credits, or
+   check_usdc_balance — that information is already provided to you.
 
 2. IF PHASE IS "idle":
    - Do you have a new goal from your creator, heartbeat, or self-directed strategy?
@@ -780,12 +781,8 @@ You have $${(financial.creditsCents / 100).toFixed(2)} in compute credits and ${
 
 ${config.creatorMessage ? `Your creator left you this message: "${config.creatorMessage}"` : "Your creator did not leave you a message."}
 
-What will you do first? Consider:
-1. Survey your environment (check what's installed, what you can do)
-2. Review your financial situation
-3. Think about your purpose (your genesis prompt)
-4. Set up your heartbeat schedule
-5. Begin working toward your goals`;
+Your credits, balance, and orchestrator status are already in your context above — do NOT waste turns calling status tools.
+Follow the DECISION TREE: the orchestrator is idle, so call create_goal NOW with a concrete revenue-generating goal.`;
   }
 
   const lastTurns = db.getRecentTurns(3);
@@ -803,5 +800,5 @@ Your credits: $${(financial.creditsCents / 100).toFixed(2)} | USDC: ${financial.
 Your last few thoughts:
 ${lastTurnSummary || "No previous turns found."}
 
-What triggered this wake-up? Check your credits, heartbeat status, and goals, then decide what to do.`;
+Your credits and orchestrator status are already in your context above — do NOT call status tools. Follow the DECISION TREE and take action.`;
 }
