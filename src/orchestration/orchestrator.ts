@@ -545,6 +545,11 @@ export class Orchestrator {
           this.params.db.prepare(
             "UPDATE task_graph SET status = 'pending', assigned_to = NULL, started_at = NULL WHERE id = ?",
           ).run(task.id);
+          // Mark the dead worker as 'dead' so getIdle() won't re-assign
+          // future tasks to it and cause an infinite recovery loop.
+          this.params.db.prepare(
+            "UPDATE children SET status = 'dead' WHERE address = ? AND status NOT IN ('dead', 'failed', 'stopped', 'cleaned_up')",
+          ).run(task.assignedTo);
         }
       }
     }
