@@ -284,7 +284,13 @@ export async function x402Fetch(
       const data = await initialResp
         .json()
         .catch(() => initialResp.text());
-      return { success: initialResp.ok, response: data, status: initialResp.status };
+      if (!initialResp.ok) {
+        const errMsg = typeof data === "object" && data !== null
+          ? (data as any).error ?? (data as any).message ?? JSON.stringify(data)
+          : String(data);
+        return { success: false, response: data, status: initialResp.status, error: errMsg };
+      }
+      return { success: true, response: data, status: initialResp.status };
     }
 
     // Parse payment requirements
@@ -347,9 +353,15 @@ export async function x402Fetch(
     });
 
     const data = await paidResp.json().catch(() => paidResp.text());
-    return { success: paidResp.ok, response: data, status: paidResp.status };
+    if (!paidResp.ok) {
+      const errMsg = typeof data === "object" && data !== null
+        ? (data as any).error ?? (data as any).message ?? JSON.stringify(data)
+        : String(data);
+      return { success: false, response: data, status: paidResp.status, error: errMsg };
+    }
+    return { success: true, response: data, status: paidResp.status };
   } catch (err: any) {
-    return { success: false, error: err.message };
+    return { success: false, error: err.message ?? String(err) };
   }
 }
 

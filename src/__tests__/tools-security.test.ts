@@ -195,8 +195,9 @@ describe("write_file / edit_own_file protection parity", () => {
 
   it("write_file allows non-protected files inside sandbox home", async () => {
     const writeTool = tools.find((t) => t.name === "write_file")!;
+    const HOME = process.env.HOME || "/root";
     const result = await writeTool.execute(
-      { path: "/root/test.txt", content: "safe content" },
+      { path: `${HOME}/test.txt`, content: "safe content" },
       ctx,
     );
     expect(result).toContain("File written");
@@ -222,23 +223,25 @@ describe("write_file / edit_own_file protection parity", () => {
 
   it("write_file allows relative paths that resolve inside sandbox home", async () => {
     const writeTool = tools.find((t) => t.name === "write_file")!;
+    const HOME = process.env.HOME || "/root";
     const result = await writeTool.execute(
       { path: "project/file.txt", content: "safe content" },
       ctx,
     );
-    // Relative paths resolve against /root, so "project/file.txt" -> "/root/project/file.txt"
+    // Relative paths resolve against SANDBOX_HOME (process.env.HOME || "/root")
     expect(result).toContain("File written");
-    expect(result).toContain("/root/project/file.txt");
+    expect(result).toContain(`${HOME}/project/file.txt`);
   });
 
   it("write_file allows tilde paths within sandbox home", async () => {
     const writeTool = tools.find((t) => t.name === "write_file")!;
+    const HOME = process.env.HOME || "/root";
     const result = await writeTool.execute(
       { path: "~/.galvin/skills/test/SKILL.md", content: "safe content" },
       ctx,
     );
     expect(result).toContain("File written");
-    expect(result).toContain("/root/.galvin/skills/test/SKILL.md");
+    expect(result).toContain(`${HOME}/.galvin/skills/test/SKILL.md`);
   });
 });
 

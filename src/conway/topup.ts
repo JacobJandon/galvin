@@ -49,11 +49,22 @@ export async function topupCredits(
   const result = await x402Fetch(url, account, "GET");
 
   if (!result.success) {
-    logger.error(`Credit topup failed: ${result.error}`);
+    const errDetail = result.error ?? (result.status ? `HTTP ${result.status}` : "unknown");
+    const respSnippet = typeof result.response === "string"
+      ? result.response.slice(0, 200)
+      : result.response != null
+        ? JSON.stringify(result.response).slice(0, 200)
+        : undefined;
+    logger.error("Credit topup failed", undefined, {
+      error: errDetail,
+      status: result.status,
+      response: respSnippet,
+      url,
+    });
     return {
       success: false,
       amountUsd,
-      error: result.error || `HTTP ${result.status}`,
+      error: errDetail,
     };
   }
 

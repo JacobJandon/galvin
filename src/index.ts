@@ -615,6 +615,11 @@ async function run(): Promise<void> {
               `[${new Date().toISOString()}] Bootstrap topup: +$${topupResult.amountUsd} credits from USDC`,
             );
           }
+          // Stamp cooldown keys so the heartbeat task and agent loop
+          // won't immediately retry within seconds of this startup topup.
+          const now = new Date().toISOString();
+          db.setKV("last_auto_topup_attempt", now);
+          db.setKV("last_inline_topup_attempt", now);
         })(),
         bootstrapTimeout,
       ]);
