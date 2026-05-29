@@ -8,6 +8,10 @@ dist
 *.db-wal
 *.db-shm
 *.tgz
-.automaton/wallet.json
-.automaton/state.db
+.galvin/wallet.json
+.galvin/state.db
+
+# Archived agent-generated earning experiments (kept locally, out of git)
+_archive/
+.omc/
 
