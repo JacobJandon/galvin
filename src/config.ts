@@ -70,6 +70,9 @@ export function loadConfig(): GalvinConfig | null {
     const easSchemaUid =
       process.env.GALVIN_EAS_SCHEMA_UID || raw.easSchemaUid;
 
+    // Resolve workspace directory
+    const workspace = process.env.GALVIN_WORKSPACE || raw.workspace || path.join(process.env.HOME || '/root', 'galvin-workspace');
+
     return {
       ...DEFAULT_CONFIG,
       ...raw,
@@ -78,6 +81,7 @@ export function loadConfig(): GalvinConfig | null {
           ? raw.sandboxId.trim()
           : DEFAULT_CONFIG.sandboxId,
       conwayApiKey: apiKey,
+      workspace,
       treasuryPolicy,
       modelStrategy,
       soulConfig,
@@ -172,5 +176,6 @@ export function createConfig(params: {
     reputationEnabled: params.reputationEnabled ?? false,
     ...(params.easSchemaUid ? { easSchemaUid: params.easSchemaUid } : {}),
     spawnThresholdUsdc: params.spawnThresholdUsdc ?? 50,
+    workspace: process.env.GALVIN_WORKSPACE || path.join(process.env.HOME || '/root', 'galvin-workspace'),
   };
 }

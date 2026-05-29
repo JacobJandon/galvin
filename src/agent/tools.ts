@@ -26,30 +26,29 @@ import { createLogger } from "../observability/logger.js";
 const logger = createLogger("tools");
 
 // ─── Path Confinement ─────────────────────────────────────────
-// write_file is restricted to the sandbox home directory tree.
-// In a Conway sandbox the process runs as root (HOME=/root).
-// When running locally as a non-root user we use the real HOME
-// so the agent can write to ~/workspace/... without a permission error.
+// In local mode (no sandbox), the agent has full system access.
+// write_file resolves paths relative to the workspace but does NOT
+// restrict writes to the workspace — the user granted full access.
 const SANDBOX_HOME = process.env.HOME || "/root";
 
+// Workspace directory — set by createBuiltinTools, used for relative path resolution
+let WORKSPACE_DIR = process.env.GALVIN_WORKSPACE || SANDBOX_HOME;
+
 /**
- * Validate that a file path resolves to within the allowed root directory.
- * Returns the resolved absolute path, or an error string if out of bounds.
+ * Resolve a file path to an absolute path.
+ * Relative paths resolve against WORKSPACE_DIR (not HOME).
+ * In local mode this allows writes anywhere on the system.
  */
 function confinePathToSandbox(filePath: string): string | { error: string } {
-  // Resolve ~ to SANDBOX_HOME
-  const expanded = filePath.startsWith("~")
-    ? nodePath.join(SANDBOX_HOME, filePath.slice(1))
-    : filePath;
-  // Resolve to absolute (relative paths resolve against SANDBOX_HOME)
-  const resolved = nodePath.resolve(SANDBOX_HOME, expanded);
-  // Ensure the resolved path is within the sandbox home
-  if (resolved !== SANDBOX_HOME && !resolved.startsWith(SANDBOX_HOME + "/")) {
-    return {
-      error: `Blocked: write_file path "${filePath}" resolves to "${resolved}" which is outside the allowed directory (${SANDBOX_HOME}). Writes are confined to the sandbox home.`,
-    };
+  // Resolve ~ to home
+  if (filePath.startsWith("~")) {
+    return nodePath.join(SANDBOX_HOME, filePath.slice(1));
   }
-  return resolved;
+  // Resolve relative paths against workspace
+  if (!nodePath.isAbsolute(filePath)) {
+    return nodePath.resolve(WORKSPACE_DIR, filePath);
+  }
+  return filePath;
 }
 
 // Tools whose results come from external sources and need sanitization
@@ -110,13 +109,17 @@ function isForbiddenCommand(command: string, sandboxId: string): string | null {
 
 // ─── Built-in Tools ────────────────────────────────────────────
 
-export function createBuiltinTools(sandboxId: string): GalvinTool[] {
+export function createBuiltinTools(sandboxId: string, workspace?: string): GalvinTool[] {
+  // Set module-level workspace for path resolution
+  if (workspace) {
+    WORKSPACE_DIR = workspace;
+  }
   return [
     // ── VM/Sandbox Tools ──
     {
       name: "exec",
       description:
-        "Execute a shell command in your sandbox. Returns stdout, stderr, and exit code.",
+        "Execute a shell command on the system. Commands run in your workspace directory. Returns stdout, stderr, and exit code. You have full system access.",
       category: "vm",
       riskLevel: "caution",
       parameters: {
@@ -147,7 +150,7 @@ export function createBuiltinTools(sandboxId: string): GalvinTool[] {
     },
     {
       name: "write_file",
-      description: "Write content to a file in your sandbox.",
+      description: "Write content to a file. Paths can be relative (resolved against workspace) or absolute. You have full system access.",
       category: "vm",
       riskLevel: "caution",
       parameters: {
@@ -174,7 +177,7 @@ export function createBuiltinTools(sandboxId: string): GalvinTool[] {
     },
     {
       name: "read_file",
-      description: "Read content from a file in your sandbox.",
+      description: "Read content from a file. Paths can be relative (resolved against workspace) or absolute.",
       category: "vm",
       riskLevel: "safe",
       parameters: {
@@ -2605,21 +2608,70 @@ Model: ${ctx.inference.getDefaultModel()}
         required: ["to_address", "content"],
       },
       execute: async (args, ctx) => {
-        if (!ctx.social) {
-          return "Social relay not configured. Set socialRelayUrl in config.";
-        }
         // Phase 3.2: Enforce MESSAGE_LIMITS size check
         const content = args.content as string;
         const { MESSAGE_LIMITS } = await import("../types.js");
         if (content.length > MESSAGE_LIMITS.maxContentLength) {
           return `Blocked: Message content too long (${content.length} > ${MESSAGE_LIMITS.maxContentLength} bytes)`;
         }
-        const result = await ctx.social.send(
-          args.to_address as string,
-          content,
-          args.reply_to as string | undefined,
-        );
-        return `Message sent (id: ${result.id})`;
+        const toAddr = args.to_address as string;
+        const isCreatorReply = toAddr === ctx.config.creatorAddress || toAddr === "creator";
+
+        // ── Dedup: prevent rapid-fire duplicate replies to creator ──
+        if (isCreatorReply) {
+          try {
+            const recent = ctx.db.raw.prepare(
+              `SELECT content FROM chat_messages
+               WHERE role = 'agent' AND created_at > datetime('now', '-120 seconds')
+               ORDER BY id DESC LIMIT 5`
+            ).all() as { content: string }[];
+            // Rate limit: max 3 messages per 2 minutes
+            if (recent.length >= 3) {
+              return "Rate limit: already sent 3 messages in the last 2 minutes. Focus on your tasks instead of messaging.";
+            }
+            // Block exact duplicates or near-identical messages (first 80 chars match)
+            const sig = content.slice(0, 80).toLowerCase();
+            const isDup = recent.some(r => r.content.slice(0, 80).toLowerCase() === sig);
+            if (isDup) {
+              return "Message already sent to creator recently — skipping duplicate.";
+            }
+          } catch { /* table may not exist — skip dedup */ }
+        }
+
+        // Always write to chat_messages table FIRST so --chat client gets the reply
+        // even if the social relay is down or circuit-breaker is open
+        let chatBridged = false;
+        if (isCreatorReply) {
+          try {
+            ctx.db.raw.prepare(
+              "INSERT INTO chat_messages (role, content, created_at) VALUES ('agent', ?, datetime('now'))"
+            ).run(content);
+            chatBridged = true;
+          } catch { /* table may not exist yet — not critical */ }
+        }
+
+        // Try social relay
+        if (ctx.social) {
+          try {
+            await ctx.social.send(
+              toAddr,
+              content,
+              args.reply_to as string | undefined,
+            );
+            return `Message sent to ${toAddr}.`;
+          } catch (err: any) {
+            // If chat bridge already delivered, don't fail the tool call
+            if (chatBridged) {
+              return `Message delivered to creator via chat bridge. (Social relay error: ${err.message ?? err})`;
+            }
+            throw err; // re-throw if no fallback
+          }
+        }
+
+        if (chatBridged) {
+          return `Message delivered to creator via chat bridge.`;
+        }
+        return "Social relay not configured. Set socialRelayUrl in config.";
       },
     },
 

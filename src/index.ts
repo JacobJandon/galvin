@@ -44,6 +44,8 @@ import {
   OK, WARN, FAIL, INFO, SKIP, G, G2, GR, YEL, RED, CYN, B, R, DIM,
   fmtBytes, shortAddr, fmtDuration,
 } from "./setup/print.js";
+import { startGateway, type GatewayServer } from "./gateway/index.js";
+import { getRunningAgent, removeLock, checkAgentLive, probeGateway } from "./gateway/lock.js";
 
 const logger = createLogger("main");
 const VERSION = "0.3.0";
@@ -68,6 +70,7 @@ async function main(): Promise<void> {
       print(`  ${G2}galvin ${name.padEnd(pad)}${R}  ${GR}${desc}${R}`);
     print(`\n  ${DIM}Core:${R}`);
     cmd("--run",          "Start Galvin (setup wizard on first run)");
+    cmd("--chat",         "Chat with Galvin in the terminal");
     cmd("--doctor",       "Run system health check");
     cmd("--status",       "Show current agent status");
     cmd("--version",      "Show version");
@@ -330,6 +333,11 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (args.includes("--chat")) {
+    await chatClient();
+    return;
+  }
+
   if (args.includes("--run")) {
     StructuredLogger.setSink(prettySink);
     await run();
@@ -362,9 +370,21 @@ async function showStatus(): Promise<void> {
   const registry     = db.getRegistryEntry();
   const aliveChilden = children.filter((c) => c.status !== "dead").length;
 
-  const stateIcon = state === "running"  ? OK
-    : state === "sleeping" ? SKIP
-    : state === "dead"     ? FAIL
+  // ── Gateway liveness probe ──────────────────────────────
+  const liveCheck = await checkAgentLive();
+  const gatewayAlive = liveCheck.running;
+  let gatewayHealth: Record<string, unknown> | null = null;
+  if (liveCheck.running) {
+    gatewayHealth = liveCheck.health;
+  }
+
+  const liveState = gatewayAlive
+    ? (gatewayHealth as any)?.state ?? state
+    : state;
+
+  const stateIcon = liveState === "running"  ? OK
+    : liveState === "sleeping" ? SKIP
+    : liveState === "dead"     ? FAIL
     : INFO;
 
   boxHeader(`Galvin Status`);
@@ -377,8 +397,19 @@ async function showStatus(): Promise<void> {
   kv("Model",       config.inferenceModel);
   kv("Config ver",  config.version || "n/a");
   gap();
+  section("Gateway");
+  if (gatewayAlive && liveCheck.running) {
+    const h = gatewayHealth as any;
+    row(OK, "Gateway",   `online  ·  :${liveCheck.lock.port}  ·  PID ${liveCheck.lock.pid}`);
+    row(OK, "Uptime",    h?.uptimeHuman ?? "unknown");
+    row(OK, "Started",   liveCheck.lock.startedAt?.replace("T", " ").slice(0, 19) ?? "unknown");
+  } else {
+    row(FAIL, "Gateway",  `offline  —  agent is not running`);
+    hint(`Start with: galvin --run`);
+  }
+  gap();
   section("Runtime");
-  row(stateIcon, "State",      state.toUpperCase());
+  row(stateIcon, "State",      liveState.toUpperCase());
   row(OK,        "Turns",      String(turnCount));
   row(tools.length > 0  ? OK : WARN,  "Tools",       `${tools.length} active`);
   row(skills.length > 0 ? OK : SKIP, "Skills",      `${skills.length} active`);
@@ -388,6 +419,341 @@ async function showStatus(): Promise<void> {
   gap();
 
   db.close();
+}
+
+// ─── Chat Client (connects to running agent via shared DB) ─────
+
+async function chatClient(): Promise<void> {
+  const config = loadConfig();
+  if (!config) {
+    print(`\n  ${FAIL}  Not configured. Run: ${G2}galvin --setup${R}\n`);
+    process.exit(1);
+  }
+
+  // ── Gate: Agent MUST be running ────────────────────────────
+  const liveCheck = await checkAgentLive();
+  if (!liveCheck.running) {
+    print(`\n  ${FAIL}  ${B}${config.name} is not running.${R}`);
+    print(`  ${GR}${DIM}Reason: ${liveCheck.reason}${R}`);
+    print(`\n  ${INFO}  Start the agent first: ${G2}galvin --run${R}\n`);
+    process.exit(1);
+  }
+
+  const gatewayPort = liveCheck.lock.port;
+  const gatewayPid = liveCheck.lock.pid;
+
+  const dbPath = resolvePath(config.dbPath);
+
+  // Open DB in WAL mode for concurrent access with the running agent
+  const Database = (await import("better-sqlite3")).default;
+  const db = new Database(dbPath);
+  db.pragma("journal_mode = WAL");
+  db.pragma("busy_timeout = 5000");
+
+  // Ensure chat_messages table exists (migration may not have run yet)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      role       TEXT NOT NULL CHECK(role IN ('user','agent')),
+      content    TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      read       INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_unread ON chat_messages(role, read) WHERE read = 0;
+  `);
+
+  // Check if agent is running (now guaranteed by gateway gate above)
+  const agentState = (liveCheck.health as any)?.state ?? "running";
+
+  const nc = process.env.GALVIN_NO_COLOR === "1";
+  const _B = nc ? "" : "\x1b[1m";
+  const _R = nc ? "" : "\x1b[0m";
+  const _CYN = nc ? "" : "\x1b[36m";
+  const _GRN = nc ? "" : "\x1b[32m";
+  const _MAG = nc ? "" : "\x1b[35m";
+  const _DIM = nc ? "" : "\x1b[2m";
+  const _YEL = nc ? "" : "\x1b[33m";
+  const _RED = nc ? "" : "\x1b[31m";
+
+  // Banner — 43-char inner width box
+  const boxW = 41; // usable chars between │ padding │
+  const pad = (text: string) => text + " ".repeat(Math.max(0, boxW - text.length));
+  print("");
+  print(`  ${_MAG}${_B}╭───────────────────────────────────────────╮${_R}`);
+  print(`  ${_MAG}${_B}│${_R}  ${_B}${pad(`Chat with ${config.name}`)}${_R}${_MAG}${_B}│${_R}`);
+  print(`  ${_MAG}${_B}│${_R}  ${_DIM}${pad(`State: ${agentState}  ·  Gateway: :${gatewayPort}`)}${_R}${_MAG}${_B}│${_R}`);
+  print(`  ${_MAG}${_B}│${_R}  ${_DIM}${pad(`PID: ${gatewayPid}  ·  /quit to exit`)}${_R}${_MAG}${_B}│${_R}`);
+  print(`  ${_MAG}${_B}╰───────────────────────────────────────────╯${_R}`);
+  print("");
+
+  // Mark any stale agent messages as read so we don't flood on reconnect.
+  try {
+    db.exec(`UPDATE chat_messages SET read = 1 WHERE role = 'agent' AND read = 0
+              AND created_at < datetime('now', '-30 seconds')`);
+  } catch { /* not critical */ }
+
+  const agentName = config.name;
+  const creatorAddr = config.creatorAddress || "creator";
+
+  // Prepared statements
+  const insertChat = db.prepare(
+    "INSERT INTO chat_messages (role, content, created_at) VALUES (?, ?, ?)"
+  );
+  const insertInbox = db.prepare(
+    `INSERT INTO inbox_messages (id, from_address, content, received_at, status, retry_count, max_retries)
+     VALUES (?, ?, ?, ?, 'received', 0, 3)`
+  );
+  const readAgentMessages = db.prepare(
+    "SELECT id, content, created_at FROM chat_messages WHERE role = 'agent' AND read = 0 ORDER BY id ASC"
+  );
+  const markRead = db.prepare(
+    "UPDATE chat_messages SET read = 1 WHERE id = ?"
+  );
+
+  const rl = createInterface({
+    input: process.stdin,
+    output: process.stdout,
+    prompt: `${_CYN}${_B}you ▸${_R} `,
+    terminal: true,
+  });
+
+  // ── State Machine ──────────────────────────────────────────
+  // "ready"    = accepting user input
+  // "waiting"  = message sent, waiting for agent reply (input paused)
+  let chatState: "ready" | "waiting" = "ready";
+  let waitingTimer: ReturnType<typeof setTimeout> | null = null;
+  let spinnerFrame = 0;
+  const spinnerChars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+  let spinnerInterval: ReturnType<typeof setInterval> | null = null;
+  const REPLY_TIMEOUT_MS = 60_000; // 60s max wait for reply
+
+  function startSpinner(): void {
+    spinnerFrame = 0;
+    spinnerInterval = setInterval(() => {
+      const frame = spinnerChars[spinnerFrame % spinnerChars.length];
+      process.stdout.write(`\r  ${_DIM}${frame} ${agentName} is thinking...${_R}\x1b[K`);
+      spinnerFrame++;
+    }, 80);
+  }
+
+  function stopSpinner(): void {
+    if (spinnerInterval) {
+      clearInterval(spinnerInterval);
+      spinnerInterval = null;
+    }
+    // Clear the spinner line
+    process.stdout.write("\r\x1b[K");
+  }
+
+  function showReply(content: string): void {
+    const lines = content.split("\n");
+    for (const line of lines) {
+      print(`  ${_GRN}${_B}${agentName} ▸${_R} ${line}`);
+    }
+    print("");
+  }
+
+  function enterWaiting(): void {
+    chatState = "waiting";
+    // Pause input — hide prompt
+    rl.pause();
+    startSpinner();
+
+    // Poll for reply aggressively (every 400ms)
+    const poll = (): void => {
+      try {
+        const rows = readAgentMessages.all() as { id: number; content: string; created_at: string }[];
+        if (rows.length > 0) {
+          stopSpinner();
+          for (const row of rows) {
+            showReply(row.content);
+            markRead.run(row.id);
+          }
+          enterReady();
+          return;
+        }
+      } catch { /* DB busy — retry next tick */ }
+      waitingTimer = setTimeout(poll, 400);
+    };
+
+    // Start timeout — if no reply in 60s, go back to ready
+    const timeout = setTimeout(() => {
+      if (chatState === "waiting") {
+        stopSpinner();
+        print(`  ${_DIM}(${agentName} hasn't replied yet — you can keep chatting or wait)${_R}\n`);
+        enterReady();
+      }
+    }, REPLY_TIMEOUT_MS);
+
+    // Start polling
+    waitingTimer = setTimeout(poll, 400);
+
+    // Store timeout ref for cleanup
+    (enterWaiting as any)._timeout = timeout;
+  }
+
+  function enterReady(): void {
+    chatState = "ready";
+    if (waitingTimer) {
+      clearTimeout(waitingTimer);
+      waitingTimer = null;
+    }
+    if ((enterWaiting as any)._timeout) {
+      clearTimeout((enterWaiting as any)._timeout);
+      (enterWaiting as any)._timeout = null;
+    }
+    rl.resume();
+    rl.prompt();
+  }
+
+  // ── Background poll for unsolicited messages + gateway liveness ──
+  let bgPollTimer: ReturnType<typeof setTimeout>;
+  let bgPollCount = 0;
+  function bgPoll(): void {
+    bgPollCount++;
+
+    // Only show unsolicited messages when we're in ready state
+    if (chatState === "ready") {
+      try {
+        const rows = readAgentMessages.all() as { id: number; content: string; created_at: string }[];
+        for (const row of rows) {
+          process.stdout.write("\r\x1b[K");
+          showReply(row.content);
+          markRead.run(row.id);
+          rl.prompt();
+        }
+      } catch { /* DB busy */ }
+    }
+
+    // Every 5th poll (~15s), check gateway is still alive
+    if (bgPollCount % 5 === 0) {
+      probeGateway(gatewayPort).then((health) => {
+        if (!health) {
+          stopSpinner();
+          if (waitingTimer) clearTimeout(waitingTimer);
+          process.stdout.write("\r\x1b[K");
+          print(`\n  ${_RED}${_B}✗${_R}  ${_RED}${agentName} has stopped running.${_R}`);
+          print(`  ${_DIM}Restart with: galvin --run${_R}\n`);
+          db.close();
+          process.exit(1);
+        }
+      }).catch(() => { /* network hiccup — retry next cycle */ });
+    }
+
+    bgPollTimer = setTimeout(bgPoll, 3000);
+  }
+  bgPollTimer = setTimeout(bgPoll, 3000);
+
+  rl.prompt();
+
+  rl.on("line", (line: string) => {
+    const text = line.trim();
+    if (!text) {
+      rl.prompt();
+      return;
+    }
+
+    // Commands always work even while waiting
+    if (text === "/quit" || text === "/exit" || text === "/q") {
+      stopSpinner();
+      if (waitingTimer) clearTimeout(waitingTimer);
+      clearTimeout(bgPollTimer);
+      print(`\n  ${_DIM}Goodbye.${_R}\n`);
+      db.close();
+      process.exit(0);
+    }
+
+    if (text === "/status") {
+      try {
+        const stRow = db.prepare("SELECT value FROM kv WHERE key = 'agent_state'").get() as { value: string } | undefined;
+        const turnRow = db.prepare("SELECT COUNT(*) as c FROM turns").get() as { c: number } | undefined;
+        const orchRow = db.prepare("SELECT value FROM kv WHERE key = 'orchestrator.last_tick'").get() as { value: string } | undefined;
+        const goalRow = db.prepare("SELECT COUNT(*) as c FROM goals WHERE status = 'active'").get() as { c: number } | undefined;
+        const state = stRow?.value ?? "unknown";
+        const turns = turnRow?.c ?? 0;
+        const goals = goalRow?.c ?? 0;
+        let phase = "unknown";
+        try { phase = JSON.parse(orchRow?.value ?? "{}").phase ?? "unknown"; } catch {}
+        print(`  ${_DIM}State: ${state} | Turns: ${turns} | Goals: ${goals} | Orchestrator: ${phase}${_R}\n`);
+      } catch { print(`  ${_DIM}Could not read status${_R}\n`); }
+      rl.prompt();
+      return;
+    }
+
+    if (text === "/history" || text === "/h") {
+      try {
+        const rows = db.prepare(
+          "SELECT role, content, created_at FROM chat_messages ORDER BY id DESC LIMIT 20"
+        ).all() as { role: string; content: string; created_at: string }[];
+        if (rows.length === 0) {
+          print(`  ${_DIM}No chat history.${_R}\n`);
+        } else {
+          print(`  ${_DIM}─── Last ${rows.length} messages ───${_R}`);
+          for (const row of rows.reverse()) {
+            const who = row.role === "user"
+              ? `${_CYN}you${_R}`
+              : `${_GRN}${agentName}${_R}`;
+            const time = row.created_at.replace("T", " ").slice(0, 19);
+            print(`  ${_DIM}${time}${_R}  ${who}: ${row.content.slice(0, 200)}`);
+          }
+          print(`  ${_DIM}───────────────────────${_R}\n`);
+        }
+      } catch { print(`  ${_DIM}Could not read history${_R}\n`); }
+      rl.prompt();
+      return;
+    }
+
+    if (text === "/help" || text === "/?") {
+      print(`  ${_DIM}Commands:${_R}`);
+      print(`  ${_CYN}/status${_R}   — agent state, turns, goals`);
+      print(`  ${_CYN}/history${_R}  — last 20 messages`);
+      print(`  ${_CYN}/quit${_R}     — exit chat`);
+      print(`  ${_CYN}/help${_R}     — this help\n`);
+      rl.prompt();
+      return;
+    }
+
+    // ── Spam protection: block input while waiting for reply ──
+    if (chatState === "waiting") {
+      stopSpinner();
+      print(`  ${_YEL}Wait for ${agentName} to reply before sending another message.${_R}\n`);
+      startSpinner();
+      return;
+    }
+
+    // Send message
+    const now = new Date().toISOString();
+    const msgId = `chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      insertChat.run("user", text, now);
+      insertInbox.run(msgId, creatorAddr, text, now);
+      // Also insert a wake event so the agent loop wakes up quickly
+      try {
+        db.prepare(
+          "INSERT INTO wake_events (source, reason, created_at) VALUES (?, ?, ?)"
+        ).run("chat", `Creator message: ${text.slice(0, 50)}`, now);
+      } catch { /* table might not exist */ }
+    } catch (err: any) {
+      print(`  ${_YEL}Warning: ${err.message}${_R}\n`);
+      rl.prompt();
+      return;
+    }
+
+    // Switch to waiting state — spinner + poll for reply
+    enterWaiting();
+  });
+
+  rl.on("close", () => {
+    stopSpinner();
+    if (waitingTimer) clearTimeout(waitingTimer);
+    clearTimeout(bgPollTimer);
+    print(`\n  ${_DIM}Goodbye.${_R}\n`);
+    db.close();
+    process.exit(0);
+  });
+
+  // Keep alive
+  await new Promise(() => {});
 }
 
 // ─── Main Run ──────────────────────────────────────────────────
@@ -494,6 +860,7 @@ async function run(): Promise<void> {
     apiUrl: config.conwayApiUrl,
     apiKey,
     sandboxId: config.sandboxId,
+    workspace: config.workspace,
   });
 
   // Register Galvin identity (one-time, immutable)
@@ -551,7 +918,11 @@ async function run(): Promise<void> {
 
   // Create social client
   let social: SocialClientInterface | undefined;
-  if (config.socialAdapter === "telegram" && config.telegramBotToken && config.telegramCreatorChatId) {
+  if (config.socialAdapter === "terminal") {
+    const { createTerminalClient } = await import("./social/terminal.js");
+    social = createTerminalClient();
+    logger.info(`[${new Date().toISOString()}] Social adapter: Terminal (stdin/stdout)`);
+  } else if (config.socialAdapter === "telegram" && config.telegramBotToken && config.telegramCreatorChatId) {
     const { createTelegramClient } = await import("./social/telegram.js");
     social = createTelegramClient(config.telegramBotToken, config.telegramCreatorChatId);
     logger.info(`[${new Date().toISOString()}] Social adapter: Telegram (chat ${config.telegramCreatorChatId})`);
@@ -649,10 +1020,40 @@ async function run(): Promise<void> {
   heartbeat.start();
   logger.info(`[${new Date().toISOString()}] Heartbeat daemon started.`);
 
+  // ── Start Gateway HTTP Server ──────────────────────────────
+  let gateway: GatewayServer | null = null;
+  try {
+    // Check for stale lock / already-running instance
+    const existing = getRunningAgent();
+    if (existing) {
+      logger.warn(`Another Galvin instance is already running (PID ${existing.pid}, port ${existing.port}). Aborting.`);
+      print(`\n  ${FAIL}  Another Galvin instance is already running (PID ${existing.pid})`);
+      print(`  ${GR}Kill it first:  ${G2}kill ${existing.pid}${R}\n`);
+      heartbeat.stop();
+      db.setAgentState("sleeping");
+      db.close();
+      process.exit(1);
+    }
+
+    gateway = await startGateway({
+      db,
+      config,
+      address: account.address,
+    });
+    logger.info(`[${new Date().toISOString()}] Gateway started on port ${gateway.port}`);
+  } catch (err: any) {
+    logger.warn(`[${new Date().toISOString()}] Gateway failed to start: ${err.message} — continuing without gateway`);
+  }
+
   // Handle graceful shutdown
   const shutdown = () => {
     logger.info(`[${new Date().toISOString()}] Shutting down...`);
     heartbeat.stop();
+    if (gateway) {
+      gateway.close().catch(() => {});
+    } else {
+      removeLock(); // safety net
+    }
     db.setAgentState("sleeping");
     db.close();
     process.exit(0);
@@ -730,7 +1131,7 @@ async function run(): Promise<void> {
         );
 
         // Sleep, but check for wake requests periodically
-        const checkInterval = Math.min(sleepMs, 30_000);
+        const checkInterval = Math.min(sleepMs, 5_000);  // Check every 5s (fast wake for chat)
         let slept = 0;
         while (slept < sleepMs) {
           await sleep(checkInterval);

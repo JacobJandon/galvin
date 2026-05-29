@@ -5,7 +5,7 @@
  * The database IS Galvin's memory.
  */
 
-export const SCHEMA_VERSION = 12;
+export const SCHEMA_VERSION = 13;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -687,4 +687,17 @@ export const MIGRATION_V12 = `
   );
   CREATE INDEX IF NOT EXISTS idx_sil_skill ON skill_income_log(skill_id, ts);
   CREATE INDEX IF NOT EXISTS idx_sil_ts    ON skill_income_log(ts);
+`;
+
+export const MIGRATION_V13 = `
+  -- Schema version: 13
+  -- Chat messages: bidirectional bridge between --chat client and running agent
+  CREATE TABLE IF NOT EXISTS chat_messages (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    role       TEXT NOT NULL CHECK(role IN ('user','agent')),
+    content    TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    read       INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_chat_unread ON chat_messages(role, read) WHERE read = 0;
 `;

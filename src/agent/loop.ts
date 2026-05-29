@@ -97,7 +97,7 @@ export async function runAgentLoop(
   const { identity, config, db, conway, inference, social, skills, policyEngine, spendTracker, onStateChange, onTurnComplete, ollamaBaseUrl } =
     options;
 
-  const builtinTools = createBuiltinTools(identity.sandboxId);
+  const builtinTools = createBuiltinTools(identity.sandboxId, config.workspace);
   const installedTools = loadInstalledTools(db);
   const tools = [...builtinTools, ...installedTools];
   const toolContext: ToolContext = {
@@ -433,19 +433,43 @@ export async function runAgentLoop(
       // Check for unprocessed inbox messages using the state machine:
       // received → in_progress (claim) → processed (on success) or received/failed (on failure)
       if (!pendingInput) {
+        // In chat mode, directly poll the social client on each iteration
+        // so messages appear instantly rather than waiting for the 60s heartbeat.
+        if (social) {
+          try {
+            const cursor = db.getKV("social_inbox_cursor") || undefined;
+            const pollResult = await social.poll(cursor);
+            if (pollResult.nextCursor) {
+              db.setKV("social_inbox_cursor", pollResult.nextCursor);
+            }
+            for (const msg of pollResult.messages) {
+              const existing = db.getKV(`inbox_seen_${msg.id}`);
+              if (!existing) {
+                db.setKV(`inbox_seen_${msg.id}`, "1");
+                db.insertInboxMessage(msg);
+              }
+            }
+          } catch {
+            // Silent — heartbeat will handle retries
+          }
+        }
+
         claimedMessages = claimInboxMessages(db.raw, 10);
         if (claimedMessages.length > 0) {
           const formatted = claimedMessages
             .map((m) => {
-              const from = sanitizeInput(m.fromAddress, m.fromAddress, "social_address");
-              const content = sanitizeInput(m.content, m.fromAddress, "social_message");
+              const isCreator = m.fromAddress === config.creatorAddress;
+              const label = isCreator ? "creator" : m.fromAddress;
+              const content = sanitizeInput(m.content, label, "social_message");
               if (content.blocked) {
+                const from = sanitizeInput(m.fromAddress, m.fromAddress, "social_address");
                 return `[INJECTION BLOCKED from ${from.content}]: message was blocked by safety filter`;
               }
-              return `[Message from ${from.content}]: ${content.content}`;
+              // sanitizeInput already wraps content as "[Message from <label>]: <text>"
+              return content.content;
             })
             .join("\n\n");
-          pendingInput = { content: formatted, source: "agent" };
+          pendingInput = { content: formatted, source: "inbox" };
         }
       }
 
@@ -600,7 +624,8 @@ export async function runAgentLoop(
         if (
           ORCHESTRATOR_BUSY_PHASES.has(orchestratorTick.phase) &&
           orchestratorTick.tasksCompleted === 0 &&
-          orchestratorTick.tasksFailed === 0
+          orchestratorTick.tasksFailed === 0 &&
+          !pendingInput  // Don't skip inference when creator sent a message
         ) {
           // Executing phase: workers need time to run, so wait longer.
           // Other phases: the tick itself does the LLM work; just a brief pause.

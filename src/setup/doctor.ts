@@ -22,6 +22,7 @@ import {
 } from "../state/database.js";
 import { SCHEMA_VERSION } from "../state/schema.js";
 import { getGalvinDir, getWalletPath } from "../identity/wallet.js";
+import { readLock, isPidAlive, probeGateway, getRunningAgent, type LockInfo } from "../gateway/lock.js";
 import {
   print, gap, rule, section, boxHeader, row, hint, kv,
   OK, WARN, FAIL, SKIP, INFO,
@@ -1034,15 +1035,15 @@ function checkStateDir(checks: Check[]): void {
 
 // ─── 15 · Process & Locks ────────────────────────────────────────────────────
 
-function checkProcessLocks(checks: Check[]): void {
+async function checkProcessLocks(checks: Check[]): Promise<void> {
   section("Process & Locks");
 
   const galvinDir = getGalvinDir();
   const pidFile = path.join(galvinDir, "galvin.pid");
 
-  // galvin.pid check
+  // galvin.pid check (legacy — may still exist from older versions)
   if (!existsSync(pidFile)) {
-    emitCheck({ label: "PID file", status: "pass", detail: "none (not running as daemon)" });
+    emitCheck({ label: "PID file (legacy)", status: "pass", detail: "none" });
   } else {
     try {
       const pid = parseInt(readFileSync(pidFile, "utf-8").trim(), 10);
@@ -1052,20 +1053,59 @@ function checkProcessLocks(checks: Check[]): void {
       const ageMs = Date.now() - pidStat.mtimeMs;
       const stale = !alive && ageMs > 30 * 60 * 1000;
       push(checks, {
-        label: "PID file",
+        label: "PID file (legacy)",
         status: stale ? "warn" : alive ? "pass" : "warn",
         detail: `pid=${pid}  (${alive ? "alive" : "dead"})  age=${relativeTime(new Date(pidStat.mtimeMs).toISOString())}`,
         hints: stale ? [`Run: rm "${pidFile}" to clear stale lock`] : [],
       });
     } catch {
-      emitCheck({ label: "PID file", status: "pass", detail: "unreadable (skipped)" });
+      emitCheck({ label: "PID file (legacy)", status: "pass", detail: "unreadable (skipped)" });
+    }
+  }
+
+  // ── Gateway lock file check ──────────────────────────────
+  const lock = readLock();
+  if (!lock) {
+    push(checks, {
+      label: "Gateway lock",
+      status: "warn",
+      detail: "no lock file — agent is not running",
+      hints: ["Start with: galvin --run"],
+    });
+  } else {
+    const alive = isPidAlive(lock.pid);
+    if (!alive) {
+      push(checks, {
+        label: "Gateway lock",
+        status: "warn",
+        detail: `stale lock (PID ${lock.pid} is dead)  started: ${lock.startedAt}`,
+        hints: ["The lock file references a dead process. It will be auto-cleaned on next run."],
+      });
+    } else {
+      // PID alive — probe the HTTP server
+      const health = await probeGateway(lock.port);
+      if (health) {
+        const h = health as any;
+        emitCheck({
+          label: "Gateway lock",
+          status: "pass",
+          detail: `PID ${lock.pid}  ·  :${lock.port}  ·  uptime ${h.uptimeHuman ?? "?"}  ·  state: ${h.state ?? "?"}`,
+        });
+      } else {
+        push(checks, {
+          label: "Gateway lock",
+          status: "warn",
+          detail: `PID ${lock.pid} alive but gateway HTTP on :${lock.port} not responding`,
+          hints: ["The agent process exists but the gateway server may have crashed"],
+        });
+      }
     }
   }
 
   // Stale .lock files in galvin dir
   try {
     const lockFiles = execSync(
-      `find "${galvinDir}" -maxdepth 3 -name "*.lock" 2>/dev/null | head -20`,
+      `find "${galvinDir}" -maxdepth 3 -name "*.lock" -not -name "galvin.lock" 2>/dev/null | head -20`,
       { encoding: "utf-8", timeout: 3000 },
     ).trim().split("\n").filter(Boolean);
 
@@ -1082,13 +1122,13 @@ function checkProcessLocks(checks: Check[]): void {
         } catch { details.push(path.basename(lf)); }
       }
       push(checks, {
-        label: "Lock files",
+        label: "Other lock files",
         status: staleCount > 0 ? "warn" : "pass",
         detail: `${lockFiles.length} found: ${details.join(", ")}`,
-        hints: staleCount > 0 ? [`find "${galvinDir}" -name "*.lock" -mmin +60 -delete`] : [],
+        hints: staleCount > 0 ? [`find "${galvinDir}" -name "*.lock" -not -name "galvin.lock" -mmin +60 -delete`] : [],
       });
     } else {
-      emitCheck({ label: "Lock files", status: "pass", detail: "none" });
+      emitCheck({ label: "Other lock files", status: "pass", detail: "none" });
     }
   } catch { /**/ }
 
@@ -1098,15 +1138,17 @@ function checkProcessLocks(checks: Check[]): void {
       encoding: "utf-8", timeout: 2000,
     }).trim();
     const pids = psOut.split("\n").filter(Boolean).map(Number).filter((p) => !isNaN(p) && p !== process.pid);
-    if (pids.length > 0) {
+    if (pids.length > 1) {
       push(checks, {
-        label: "Running instance",
+        label: "Running instances",
         status: "warn",
-        detail: `galvin --run already running  (pid ${pids.join(", ")})`,
+        detail: `${pids.length} galvin processes detected  (pids: ${pids.join(", ")})`,
         hints: ["Only one galvin agent should run at a time"],
       });
+    } else if (pids.length === 1) {
+      emitCheck({ label: "Running instances", status: "pass", detail: `1 instance  (PID ${pids[0]})` });
     } else {
-      emitCheck({ label: "Running instance", status: "pass", detail: "none detected" });
+      emitCheck({ label: "Running instances", status: "pass", detail: "none detected" });
     }
   } catch { /**/ }
 

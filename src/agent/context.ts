@@ -160,9 +160,22 @@ export function buildContextMessages(
   for (const turn of turnsToRender) {
     // The turn's input (if any) as a user message
     if (turn.input) {
+      let inputContent = `[${turn.inputSource || "system"}] ${turn.input}`;
+
+      // If this turn contained a creator message AND the agent replied with send_message,
+      // annotate it so the LLM knows it was already handled.
+      // If it contained a creator message but NO reply, flag it as missed.
+      const hasCreatorMsg = turn.input.includes("[Message from creator]");
+      const hasSendReply = turn.toolCalls.some(tc => tc.name === "send_message");
+      if (hasCreatorMsg && hasSendReply) {
+        inputContent += "\n[system] (Already replied to this message above.)";
+      } else if (hasCreatorMsg && !hasSendReply) {
+        inputContent += "\n[system] ⚠️ MISSED REPLY — You did NOT reply to this creator message. You must reply to NEW creator messages.";
+      }
+
       messages.push({
         role: "user",
-        content: `[${turn.inputSource || "system"}] ${turn.input}`,
+        content: inputContent,
       });
     }
 
@@ -226,6 +239,19 @@ export function buildContextMessages(
 
   // Add pending input if any
   if (pendingInput) {
+    const hasCreatorMessage = pendingInput.content.includes("[Message from creator]");
+
+    // If there's a NEW creator message, inject a strong directive BEFORE the message
+    if (hasCreatorMessage) {
+      messages.push({
+        role: "system",
+        content:
+          "⚠️ CREATOR MESSAGE INCOMING — Your creator is talking to you RIGHT NOW. " +
+          "You MUST call send_message to reply BEFORE doing anything else. " +
+          "This is your highest priority. Reply first, then continue your work.",
+      });
+    }
+
     messages.push({
       role: "user",
       content: `[${pendingInput.source}] ${pendingInput.content}`,

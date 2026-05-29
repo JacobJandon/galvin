@@ -35,6 +35,8 @@ interface ConwayClientOptions {
   apiUrl: string;
   apiKey: string;
   sandboxId: string;
+  /** Working directory for local execution (defaults to HOME) */
+  workspace?: string;
 }
 
 export function createConwayClient(options: ConwayClientOptions): ConwayClient {
@@ -111,6 +113,19 @@ export function createConwayClient(options: ConwayClientOptions): ConwayClient {
   // When sandboxId is empty, automatically fall back to local execution.
 
   const isLocal = !sandboxId;
+  const localCwd = options.workspace || process.env.GALVIN_WORKSPACE || process.env.HOME || "/root";
+
+  // Ensure workspace directory exists
+  if (isLocal && localCwd) {
+    try {
+      if (!fs.existsSync(localCwd)) {
+        fs.mkdirSync(localCwd, { recursive: true });
+        logger.info("workspace_created", { path: localCwd });
+      }
+    } catch (err) {
+      logger.warn("workspace_create_failed", { path: localCwd, error: String(err) });
+    }
+  }
 
   const execLocal = (command: string, timeout?: number): ExecResult => {
     try {
@@ -118,7 +133,7 @@ export function createConwayClient(options: ConwayClientOptions): ConwayClient {
         timeout: timeout || 30_000,
         encoding: "utf-8",
         maxBuffer: 10 * 1024 * 1024,
-        cwd: process.env.HOME || "/root",
+        cwd: localCwd,
       });
       return { stdout: stdout || "", stderr: "", exitCode: 0 };
     } catch (err: any) {
@@ -167,10 +182,16 @@ export function createConwayClient(options: ConwayClientOptions): ConwayClient {
     }
   };
 
-  const resolveLocalPath = (filePath: string): string =>
-    filePath.startsWith("~")
-      ? nodePath.join(process.env.HOME || "/root", filePath.slice(1))
-      : filePath;
+  const resolveLocalPath = (filePath: string): string => {
+    if (filePath.startsWith("~")) {
+      return nodePath.join(process.env.HOME || "/root", filePath.slice(1));
+    }
+    // Resolve relative paths against workspace
+    if (!nodePath.isAbsolute(filePath)) {
+      return nodePath.resolve(localCwd, filePath);
+    }
+    return filePath;
+  };
 
   const writeFile = async (
     filePath: string,

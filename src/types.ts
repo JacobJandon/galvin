@@ -73,7 +73,7 @@ export interface GalvinConfig {
   /** Creator's Telegram chat ID as a numeric string (e.g. "987654321") */
   telegramCreatorChatId?: string;
   /** Which social adapter to use. Defaults to "conway" if socialRelayUrl is set. */
-  socialAdapter?: "conway" | "telegram";
+  socialAdapter?: "conway" | "telegram" | "terminal";
   /** Enable EAS on-chain reputation attestations (requires funded wallet for gas) */
   reputationEnabled?: boolean;
   /** Base mainnet network for EAS ("base" | "optimism") */
@@ -84,6 +84,8 @@ export interface GalvinConfig {
   spawnThresholdUsdc?: number;
   /** Hard cap on live offspring (default: same as maxChildren) */
   maxOffspring?: number;
+  /** Directory where the agent works (exec cwd, file operations). Defaults to ~/galvin-workspace */
+  workspace?: string;
 }
 
 export const DEFAULT_CONFIG: Partial<GalvinConfig> = {
