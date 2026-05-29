@@ -10,6 +10,37 @@
 import type { HttpClientConfig } from "../types.js";
 import { DEFAULT_HTTP_CLIENT_CONFIG } from "../types.js";
 
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
+
+/**
+ * Enforce HTTPS at the transport layer (CWE-319). Rejects plain HTTP to
+ * remote hosts unconditionally. Allows http: only when allowHttpOnLoopback
+ * is set AND the host is loopback (for local dev / Ollama at localhost).
+ */
+function assertSecureUrl(url: string, allowHttpOnLoopback: boolean): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`Invalid URL: ${url}`);
+  }
+
+  const protocol = parsed.protocol.toLowerCase();
+  if (protocol === "https:") {
+    return;
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (protocol === "http:" && allowHttpOnLoopback && LOOPBACK_HOSTS.has(host)) {
+    return;
+  }
+
+  throw new Error(
+    `HTTPS required: refusing insecure URL ${url}. ` +
+      "For local development, only loopback HTTP (localhost/127.0.0.1/::1) can be explicitly enabled.",
+  );
+}
+
 export class CircuitOpenError extends Error {
   constructor(public readonly resetAt: number) {
     super(
@@ -36,6 +67,8 @@ export class ResilientHttpClient {
       retries?: number;
     },
   ): Promise<Response> {
+    assertSecureUrl(url, this.config.allowHttpOnLoopback);
+
     if (this.isCircuitOpen()) {
       throw new CircuitOpenError(this.circuitOpenUntil);
     }

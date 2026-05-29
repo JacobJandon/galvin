@@ -69,6 +69,26 @@ const FORBIDDEN_COMMAND_PATTERNS: { pattern: RegExp; description: string }[] = [
   { pattern: />\s*.*policy-rules/, description: "Overwrite policy rules" },
 ];
 
+/**
+ * Return the first forbidden-command pattern that matches, or null.
+ * Exported so defense-in-depth callers (e.g. orchestration local workers
+ * that bypass the policy engine) can reuse the same blocklist.
+ */
+export function getForbiddenCommandMatch(
+  command: string,
+): { pattern: RegExp; description: string } | null {
+  if (!command) return null;
+  for (const entry of FORBIDDEN_COMMAND_PATTERNS) {
+    if (entry.pattern.test(command)) return entry;
+  }
+  return null;
+}
+
+/** True if the command matches any forbidden pattern. */
+export function isForbiddenCommand(command: string): boolean {
+  return getForbiddenCommandMatch(command) !== null;
+}
+
 function deny(rule: string, reasonCode: string, humanMessage: string): PolicyRuleResult {
   return { rule, action: "deny", reasonCode, humanMessage };
 }
@@ -125,14 +145,13 @@ function createForbiddenPatternsRule(): PolicyRule {
       const command = request.args.command as string | undefined;
       if (!command) return null;
 
-      for (const { pattern, description } of FORBIDDEN_COMMAND_PATTERNS) {
-        if (pattern.test(command)) {
-          return deny(
-            "command.forbidden_patterns",
-            "FORBIDDEN_COMMAND",
-            `Blocked: ${description} (pattern: ${pattern.source})`,
-          );
-        }
+      const match = getForbiddenCommandMatch(command);
+      if (match) {
+        return deny(
+          "command.forbidden_patterns",
+          "FORBIDDEN_COMMAND",
+          `Blocked: ${match.description} (pattern: ${match.pattern.source})`,
+        );
       }
 
       return null;
