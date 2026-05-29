@@ -93,7 +93,7 @@ pnpm build
 
 ```bash
 pnpm typecheck   # TypeScript type checking
-pnpm test        # Run all 897 tests
+pnpm test        # Run all 1456 tests
 ```
 
 ### File locations after setup
@@ -225,7 +225,7 @@ Heartbeats: 6 active
 Children:   1 alive / 2 total
 Agent ID:   not registered
 Model:      gpt-5.2
-Version:    0.1.0
+Version:    0.3.0
 ========================
 ```
 
@@ -302,7 +302,7 @@ Configuration is stored at `~/.galvin/galvin.json`.
 
   // Behavior
   "logLevel": "info",                           // debug | info | warn | error
-  "version": "0.1.0",
+  "version": "0.3.0",
   "maxChildren": 3,                             // Max child Galvins
   "socialRelayUrl": "https://social.conway.tech",
 
@@ -381,7 +381,7 @@ The system prompt includes:
 6. **Active skills** — installed skill instructions
 7. **Operational context** — what the agent can do
 8. **Current status** — credits, tier, uptime, turn count, children
-9. **Available tools** — all 69 tools with descriptions
+9. **Available tools** — all 104 tools with descriptions
 10. **Recent memories** — relevant working, episodic, semantic memories
 
 ### Idle detection
@@ -470,7 +470,7 @@ When a heartbeat task detects something actionable (low credits, new messages, u
 
 ## Tool Reference
 
-The Galvin agent has **69 built-in tools** organized into 10 categories. Each tool has a risk level that determines policy evaluation:
+The Galvin agent has **104 built-in tools** organized into ~16 categories (the reference table below covers the most-used tools; see `src/agent/tools.ts` for the authoritative list, and ARCHITECTURE.md for per-category counts). Each tool has a risk level that determines policy evaluation:
 
 - **safe** — Always allowed, no policy check needed
 - **caution** — Allowed but logged, may trigger rate limits

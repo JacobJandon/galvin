@@ -54,7 +54,7 @@ export interface GalvinConfig {
   agentId?: string;
   maxChildren: number;
   maxTurnsPerCycle?: number;
-  /** 子沙盒内存配置 (MB)，默认 1024 */
+  /** Child sandbox memory in MB (default 1024) */
   childSandboxMemoryMb?: number;
   parentAddress?: Address;
   socialRelayUrl?: string;

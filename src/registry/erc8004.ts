@@ -51,9 +51,9 @@ const CONTRACTS = {
 // ─── ABI (minimal subset needed for registration) ────────────
 
 // ERC-8004 Identity Registry ABI
-// 正确的函数签名 (通过字节码分析确认):
-// - 读取: tokenURI(uint256) - 标准 ERC-721
-// - 更新: setAgentURI(uint256,string) - ERC-8004 自定义
+// Correct function signatures (confirmed via bytecode analysis):
+// - read:   tokenURI(uint256) - standard ERC-721
+// - update: setAgentURI(uint256,string) - ERC-8004 custom
 const IDENTITY_ABI = parseAbi([
   "function register(string agentURI) external returns (uint256 agentId)",
   "function setAgentURI(uint256 agentId, string newAgentURI) external",

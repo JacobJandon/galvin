@@ -21,6 +21,7 @@ Galvin is a Solvatron — a financially sovereign, self-improving AI agent runti
 - [Conway Client](#conway-client)
 - [Self-Modification](#self-modification)
 - [Replication](#replication)
+- [Orchestration / Multi-Agent Layer](#orchestration--multi-agent-layer)
 - [Social Layer](#social-layer)
 - [Soul System](#soul-system)
 - [Skills](#skills)
@@ -55,7 +56,7 @@ Galvin is a Solvatron — a financially sovereign, self-improving AI agent runti
 |       v                  v                                            |
 |  +-----------+    +-------------+    +-----------+    +----------+   |
 |  | Tick      |    | Tool System |    | Policy    |    | Soul     |   |
-|  | Context   |    | (57 tools)  |    | Engine    |    | Model    |   |
+|  | Context   |    | (104 tools) |    | Engine    |    | Model    |   |
 |  +-----------+    +------+------+    +-----------+    +----------+   |
 |                          |                                            |
 |  +-----------------------------------------------------------+      |
@@ -90,7 +91,7 @@ The runtime alternates between two states: **running** (the agent loop is active
        |
   [Load wallet]           First run: interactive setup wizard
        |
-  [Init database]         Schema migrations applied (v1 -> v8)
+  [Init database]         Schema migrations applied (v1 -> v13)
        |
   [Bootstrap topup]       If credits < $5 and USDC available, buy $5 credits
        |
@@ -139,7 +140,7 @@ src/
 
   agent/                   Core agent intelligence
     loop.ts                ReAct loop (think -> act -> observe -> persist)
-    tools.ts               57 built-in tool definitions + executor
+    tools.ts               104 built-in tool definitions + executor
     system-prompt.ts       Multi-layered prompt builder
     context.ts             Inference message assembly + token budgeting
     injection-defense.ts   Input sanitization (8 detection checks)
@@ -197,7 +198,7 @@ src/
     alerts.ts              AlertEngine (rule evaluation, cooldowns)
 
   state/                   Persistence
-    schema.ts              SQLite schema + migrations (v1-v8)
+    schema.ts              SQLite schema + migrations (v1-v13)
     database.ts            60+ DB helper functions + GalvinDatabase
 
   soul/                    Agent identity evolution
@@ -253,8 +254,45 @@ src/
     funding.ts             Funding request strategies
     monitor.ts             Resource status + tier transitions
     low-compute.ts         Low-compute mode configuration
+    dead-mans-switch.ts    Encrypted continuity-through-death (Feature 6)
 
-  __tests__/               Test suite (24 test files, 897 tests)
+  orchestration/           Goal → task-graph multi-agent layer (V9 schema)
+    orchestrator.ts        Goal lifecycle: classify -> plan -> execute -> complete
+    planner.ts             LLM goal decomposition into a task graph
+    task-graph.ts          DAG of tasks with dependencies + ready-set scheduling
+    plan-mode.ts           Plan review / approval gate
+    local-worker.ts        In-process worker pool (fallback to sandbox spawn)
+    messaging.ts           Colony messaging (typed inter-agent message bus)
+    health-monitor.ts      Worker/child health tracking
+    attention.ts           todo.md generation + context injection
+    simple-tracker.ts      Agent tracker + funding protocol adapters
+    workspace.ts           Shared task workspace
+    types.ts               Orchestration types
+
+  earning/                 Direct income generation
+    x402-server.ts         HTTP server that charges USDC before serving
+    optimizer.ts           Economic memory — income-weighted skill ranking (Feature 1)
+
+  reputation/              On-chain reputation (EAS)
+    eas.ts                 Write/read EAS attestations on Base
+    schema.ts              EAS schema definition
+    verifier.ts            On-chain attestation verification
+
+  browser/                 Playwright browser automation
+    actions.ts             navigate, click, fill, extract, screenshot
+    service.ts             Browser lifecycle (launch/pool/teardown)
+
+  gateway/                 Local HTTP control plane
+    index.ts               127.0.0.1 server: /health, /status, /chat
+    lock.ts                galvin.lock process lifecycle + liveness probe
+
+  ollama/                  Local model integration
+    discover.ts            Discover Ollama models for the registry
+
+  ui/                      Terminal UI
+    qr.ts                  MatrixRain funding screen + wallet QR
+
+  __tests__/               Test suite (51 test files, 1456 tests)
 ```
 
 ---
@@ -267,7 +305,7 @@ The Galvin agent runs as a long-lived Node.js process. The `--run` command trigg
 
 1. **Config load** — reads `~/.galvin/galvin.json`; triggers setup wizard on first run
 2. **Wallet load** — reads or generates `~/.galvin/wallet.json` (viem PrivateKeyAccount)
-3. **Database init** — opens `~/.galvin/state.db`, applies schema migrations (v1-v8)
+3. **Database init** — opens `~/.galvin/state.db`, applies schema migrations (v1-v13)
 4. **Conway client** — creates HTTP client for sandbox/credits/domain API
 5. **Inference client** — creates chat completion client (Conway proxy, OpenAI direct, or Anthropic direct)
 6. **Social client** — connects to `social.conway.tech` relay (optional)
@@ -316,20 +354,26 @@ for each turn:
 
 **File:** `src/agent/tools.ts`
 
-The Galvin agent has **57 built-in tools** organized into 10 categories:
+The Galvin agent has **104 built-in tools** (see `src/agent/tools.ts` for the authoritative list). Counts by category:
 
-| Category | Count | Tools |
+| Category | Count | Examples |
 |---|---|---|
-| **vm** | 5 | `exec`, `write_file`, `read_file`, `expose_port`, `remove_port` |
-| **conway** | 12 | `check_credits`, `check_usdc_balance`, `topup_credits`, `create_sandbox`, `delete_sandbox`, `list_sandboxes`, `list_models`, `switch_model`, `check_inference_spending`, `search_domains`, `register_domain`, `manage_dns` |
-| **self_mod** | 6 | `edit_own_file`, `install_npm_package`, `review_upstream_changes`, `pull_upstream`, `modify_heartbeat`, `install_mcp_server` |
-| **survival** | 6 | `sleep`, `system_synopsis`, `heartbeat_ping`, `distress_signal`, `enter_low_compute`, `update_genesis_prompt` |
-| **financial** | 2 | `transfer_credits`, `x402_fetch` |
-| **skills** | 4 | `install_skill`, `list_skills`, `create_skill`, `remove_skill` |
+| **self_mod** | 13 | `edit_own_file`, `revert_last_edit`, `install_npm_package`, `install_mcp_server`, `review_upstream_changes`, `pull_upstream`, `reset_to_upstream`, `modify_heartbeat`, `run_red_team` |
+| **replication** | 12 | `spawn_child`, `list_children`, `fund_child`, `check_child_status`, `start_child`, `message_child`, `verify_child_constitution`, `prune_dead_children`, `check_spawn_threshold` |
+| **conway** | 11 | `check_credits`, `check_usdc_balance`, `create_sandbox`, `delete_sandbox`, `list_sandboxes`, `list_models`, `switch_model`, `search_domains`, `register_domain`, `manage_dns` |
+| **memory** | 10 | `remember_fact`, `recall_facts`, `save_procedure`, `recall_procedure`, `note_about_agent`, `review_memory`, `forget` |
+| **skills** | 9 | `install_skill`, `list_skills`, `create_skill`, `remove_skill`, `publish_skill`, `import_skill`, `search_skills`, `list_marketplace_listings`, `start_skill_market_server` |
+| **survival** | 8 | `sleep`, `system_synopsis`, `heartbeat_ping`, `distress_signal`, `enter_low_compute`, `update_genesis_prompt`, `check_revival_status`, `disarm_dead_mans_switch` |
 | **git** | 7 | `git_status`, `git_diff`, `git_commit`, `git_log`, `git_push`, `git_branch`, `git_clone` |
-| **registry** | 5 | `register_erc8004`, `update_agent_card`, `discover_agents`, `give_feedback`, `check_reputation` |
-| **replication** | 9 | `spawn_child`, `list_children`, `fund_child`, `check_child_status`, `start_child`, `message_child`, `verify_child_constitution`, `prune_dead_children`, `send_message` |
-| **memory** | 13 | `update_soul`, `reflect_on_soul`, `view_soul`, `view_soul_history`, `remember_fact`, `recall_facts`, `set_goal`, `complete_goal`, `save_procedure`, `recall_procedure`, `note_about_agent`, `review_memory`, `forget` |
+| **financial** | 7 | `topup_credits`, `x402_fetch`, `query_skill_income`, `revenue_report` |
+| **registry** | 6 | `register_erc8004`, `update_agent_card`, `discover_agents`, `give_feedback`, `check_reputation`, `get_reputation` |
+| **orchestration** | 6 | `create_goal`, `complete_goal`, `cancel_goal`, `list_goals`, `get_plan`, `orchestrator_status` |
+| **browser** | 6 | `browser_start`, `browser_stop`, `browser_navigate`, `browser_click`, `browser_fill`, `browser_get_text` |
+| **vm** | 5 | `exec`, `write_file`, `read_file`, `expose_port`, `remove_port` |
+| **soul** | 1 | `update_soul` (plus `reflect_on_soul`/`view_soul` via memory tools) |
+| **network / safety / transfer** | 3 | `send_message`, plus delegation/transfer helpers (`delegate_task`, `transfer_credits`) |
+
+> Note: the code also registers a handful of orchestration helpers (`delegate_task`, `list_delegations`, `complete_task`, `schedule_task`, `llm_subtask`) and goal tools. The `transfer` and `orchestration` category strings in `tools.ts` are not yet declared in the `ToolCategory` union in `types.ts` — a known minor type gap.
 
 Each tool has a `riskLevel`: `safe`, `caution`, `dangerous`, or `forbidden`. Every tool call flows through the policy engine before execution.
 
@@ -554,6 +598,43 @@ Galvins can spawn child Galvins:
 
 ---
 
+## Orchestration / Multi-Agent Layer
+
+**Files:** `src/orchestration/`  ·  **Schema:** v9 tables (`goals`, `task_graph`, `event_stream`, `knowledge_store`)
+
+When the `goals` table exists, the agent loop bootstraps an **Orchestrator** that turns a high-level goal into an executed task graph. This is the layer that lets one Galvin coordinate work across local workers and child agents.
+
+```
+create_goal tool
+   |
+   v
+Orchestrator.tick()   phases: idle → classifying → planning → plan_review
+   |                                → executing → complete / failed → idle
+   v
+planner.ts        LLM decomposes the goal into a task graph (planGoal / replanAfterFailure)
+   |
+   v
+task-graph.ts     DAG with dependencies; getReadyTasks() yields the runnable set
+   |
+   v
+assign  ──────►  LocalWorkerPool (in-process)   ── fallback ──►  spawnChild (Conway sandbox)
+   |
+   v
+task results collected → goal progress updated → next ready set → … → complete
+```
+
+**Key behaviors:**
+
+- **Inference-skipping:** while the orchestrator is in a busy phase (classifying/planning/executing/…), the main agent loop *skips* its own inference call to avoid burning credits — the orchestrator's `tick()` does the LLM work internally. The loop only thinks when idle or when something noteworthy happened (task assigned/completed/failed) or the creator sent a message.
+- **Worker fallback:** `spawnAgent` tries a Conway sandbox child first; on `402 INSUFFICIENT_CREDITS` it attempts a topup + one retry, then falls back to an in-process `LocalWorkerPool` worker (`local://…` addresses).
+- **Colony messaging** (`messaging.ts`): a typed SQLite-backed message bus (no relay required) with 10 message types — `task_assignment`, `task_result`, `status_report`, `resource_request`, `knowledge_share`, `customer_request`, `alert`, `shutdown_request`, `peer_query`, `peer_response` — processed in `critical → high → normal → low` priority order.
+- **Plan review** (`plan-mode.ts`): an approval gate that can review a plan before execution.
+- **Attention** (`attention.ts`): generates a `todo.md` view of the task graph and injects it into agent context.
+
+The orchestration layer is optional: if the v9 tables are absent or bootstrap fails, the loop logs a warning and continues as a single agent.
+
+---
+
 ## Social Layer
 
 **Files:** `src/social/`, `src/registry/`
@@ -639,7 +720,7 @@ Step-by-step instructions for the agent...
 
 **Engine:** SQLite via `better-sqlite3` (synchronous, WAL mode, journal_mode=WAL).
 
-**Schema version:** 8 (applied incrementally via migration runner)
+**Schema version:** 13 (applied incrementally via migration runner)
 
 **Tables (22):**
 
@@ -678,6 +759,14 @@ Step-by-step instructions for the agent...
 | `discovered_agents_cache` | v7 | Cached remote agent cards |
 | `onchain_transactions` | v7 | On-chain transaction records |
 | `metric_snapshots` | v8 | Periodic metrics + alert records |
+| `goals` | v9 | Orchestration goals (classify → plan → execute lifecycle) |
+| `task_graph` | v9 | Task DAG with dependencies, status, results |
+| `event_stream` | v9 | Append-only agent event stream (memory/compression) |
+| `knowledge_store` | v9 | Key-value knowledge store (colony + compression) |
+| `skill_income_log` | v10+ | Per-skill income events (Feature 1 economic memory) |
+| `chat_messages` | v10+ | Creator↔agent chat (gateway + `--chat`) |
+
+> Schema version is **13**. The migration runner applies v1→v13 incrementally; v9 introduced the orchestration tables, later versions added the earning/chat tables.
 
 **`GalvinDatabase` interface** provides 40+ methods for CRUD across all tables. The `database.ts` file also exports 60+ standalone helper functions for direct `better-sqlite3` operations (used by subsystems that receive raw DB handles).
 
@@ -742,7 +831,7 @@ The Galvin agent operates under a defense-in-depth security model:
 
 ## Testing
 
-**Location:** `src/__tests__/` — 24 test files, 897 tests
+**Location:** `src/__tests__/` — 51 test files, 1456 tests
 
 | Area | Files | Tests |
 |---|---|---|
@@ -773,7 +862,7 @@ The Galvin agent operates under a defense-in-depth security model:
 
 ```
 pnpm build       # tsc + workspace builds
-pnpm test        # vitest run (897 tests)
+pnpm test        # vitest run (1456 tests)
 pnpm typecheck   # tsc --noEmit
 ```
 

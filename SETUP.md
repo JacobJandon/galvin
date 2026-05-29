@@ -182,7 +182,7 @@ After setup, `~/.galvin/` contains:
 ├── constitution.md      # Immutable laws (read-only)
 ├── heartbeat.yml        # Heartbeat task schedule
 ├── SOUL.md              # Self-authored identity doc (evolves over time)
-├── galvin.db            # SQLite database (turns, memory, tools, etc.)
+├── state.db             # SQLite database (turns, memory, tools, etc.)
 ├── skills/              # Installed skills
 │   ├── conway-compute.md
 │   ├── conway-payments.md

@@ -17,7 +17,7 @@ Seven features that turn Galvin from a surviving agent into a truly unique Solva
 ### Implementation
 
 **New file: `src/earning/optimizer.ts`**
-- Reads `skill_income_log` from the sqlite DB (`~/.galvin/galvin.db`)
+- Reads `skill_income_log` from the sqlite DB (`~/.galvin/state.db`)
 - Computes an EMA (exponential moving average) of income per skill over the last 30 days
 - Exposes `getSkillWeights(): Map<string, number>` — normalized 0–1 weights
 - Exposes `recordIncome(skillId: string, usdc: number): void` — called from x402 server on payment
