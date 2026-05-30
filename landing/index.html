@@ -3,1330 +3,1156 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="Galvin — A Solvatron. The autonomous AI that earns its own existence or ceases to exist.">
 <title>Galvin — A Solvatron</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garant:ital,wght@0,200;0,300;0,400;0,500;1,200;1,300;1,400&display=swap" rel="stylesheet">
+<!-- Orbitron = Hermes display font. Share Tech Mono = Hermes mono. -->
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Share+Tech+Mono&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+
 <style>
-/* ─────────────────────────────────────────────
-   RESET & BASE
-───────────────────────────────────────────── */
+/* ═══════════════════════════════════════════════════════════
+   GALVIN — Hermes + Polsia exact copy
+   Hermes: #05091a bg · white fg · Orbitron · amber glow
+   Polsia: pure black · one brutal statement · silence
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* Hermes exact colors */
+  --bg:        #05091a;   /* Hermes background */
+  --bg-mid:    #0b1030;   /* slightly lighter card bg */
+  --bg-glass:  rgba(5,9,26,0.85);
+  --fg:        #ffffff;
+  --fg-dim:    rgba(255,255,255,0.55);
+  --fg-mute:   rgba(255,255,255,0.25);
+  --border:    rgba(255,255,255,0.08);
+  --border-hi: rgba(255,255,255,0.15);
+
+  /* Hermes warm glow accent */
+  --glow:      rgba(255,199,55,0.24);
+  --amber:     #ffc737;
+  --amber-dim: rgba(255,199,55,0.6);
+
+  /* Hermes green accent (terminal) */
+  --green:     #22c55e;
+  --green-dim: rgba(34,197,94,0.15);
+
+  /* Hermes fonts - EXACT */
+  --font-display: 'Orbitron', 'Eurostile', 'Impact', sans-serif;
+  --font-mono:    'Share Tech Mono', 'Courier New', monospace;
+  --font-body:    'Inter', system-ui, sans-serif;
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; overflow-x: hidden; }
 
-:root {
-  --black:   #060606;
-  --void:    #000;
-  --card-bg: #0c0c0c;
-  --border:  rgba(255,255,255,0.06);
-
-  --cream:   #ede8de;
-  --cream-2: #a09a90;
-  --cream-3: #605b52;
-
-  --gold:    #c8a455;
-  --gold-2:  #7a612a;
-
-  --serif: 'Cormorant Garant', 'Palatino Linotype', Georgia, serif;
-  --mono: 'Courier New', Courier, monospace;
-}
-
 body {
-  background: var(--black);
-  color: var(--cream);
-  font-family: var(--serif);
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   cursor: none;
   overflow-x: hidden;
 }
 
-a { text-decoration: none; }
-
-/* ─────────────────────────────────────────────
-   CUSTOM CURSOR
-───────────────────────────────────────────── */
-#cursor {
-  position: fixed;
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: var(--gold);
-  pointer-events: none;
-  z-index: 99999;
+/* ─── CURSOR ───────────────────────────────── */
+#cur {
+  position: fixed; z-index: 9999; pointer-events: none;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--amber);
   transform: translate(-50%,-50%);
-  transition: transform 80ms, width 250ms, height 250ms, opacity 200ms;
-  mix-blend-mode: difference;
+  transition: width 200ms, height 200ms, background 200ms;
 }
-
-#cursor-ring {
-  position: fixed;
-  width: 28px; height: 28px;
-  border-radius: 50%;
-  border: 1px solid rgba(200,164,85,0.5);
-  pointer-events: none;
-  z-index: 99998;
+#cur-ring {
+  position: fixed; z-index: 9998; pointer-events: none;
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 1px solid rgba(255,199,55,0.4);
   transform: translate(-50%,-50%);
-  transition: transform 0.12s ease-out, width 250ms, height 250ms, border-color 200ms;
+  transition: width 200ms, height 200ms;
+}
+body.hovered #cur { width: 14px; height: 14px; background: #fff; }
+body.hovered #cur-ring { width: 52px; height: 52px; border-color: var(--amber); }
+
+/* ─── NOISE TEXTURE (Hermes uses noise opacity 0.7) ─ */
+#noise {
+  position: fixed; inset: 0; z-index: 9997; pointer-events: none;
+  opacity: 0.06;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-body:has(a:hover) #cursor, body:has(button:hover) #cursor { transform: translate(-50%,-50%) scale(3); }
-body:has(a:hover) #cursor-ring, body:has(button:hover) #cursor-ring { width: 50px; height: 50px; border-color: var(--gold); }
-
-/* ─────────────────────────────────────────────
-   GRAIN TEXTURE
-───────────────────────────────────────────── */
-#grain {
-  position: fixed; inset: 0; z-index: 9998;
-  pointer-events: none;
-  opacity: 0.028;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.88' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  animation: grain 0.8s steps(2) infinite;
-}
-@keyframes grain {
-  0%,100%{ background-position:0 0 }
-  25%    { background-position:25% -15% }
-  50%    { background-position:-10% 5% }
-  75%    { background-position:15% 20% }
-}
-
-/* ─────────────────────────────────────────────
-   NAV — exact Praxis: wordmark + one CTA
-───────────────────────────────────────────── */
+/* ─── NAV — Hermes style ───────────────────── */
 nav {
   position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
   display: flex; justify-content: space-between; align-items: center;
-  padding: 1.8rem 3rem;
-  mix-blend-mode: normal;
+  padding: 0 2rem;
+  height: 56px;
+  background: var(--bg-glass);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
-nav::before {
+.nav-logo {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+/* Hermes: small amber dot before logo */
+.nav-logo::before {
   content: '';
-  position: absolute; inset: 0;
-  background: linear-gradient(to bottom, rgba(6,6,6,0.7) 0%, transparent 100%);
-  pointer-events: none;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 8px var(--amber);
+  flex-shrink: 0;
 }
 
-.nav-wordmark {
-  font-size: 0.78rem;
-  font-weight: 300;
-  letter-spacing: 0.5em;
-  text-transform: uppercase;
-  color: var(--cream);
-  position: relative;
-  transition: opacity 300ms;
-}
-.nav-wordmark:hover { opacity: 0.7; }
-
-.nav-right {
-  display: flex; align-items: center; gap: 2.5rem;
-  position: relative;
+.nav-links {
+  display: flex; align-items: center; gap: 0.25rem;
 }
 
 .nav-link {
-  font-size: 0.7rem;
-  font-weight: 300;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--cream-2);
-  transition: color 300ms;
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--fg-dim);
+  text-decoration: none;
+  padding: 0.4rem 0.85rem;
+  border-radius: 4px;
+  transition: color 200ms, background 200ms;
 }
-.nav-link:hover { color: var(--cream); }
+.nav-link:hover { color: var(--fg); background: rgba(255,255,255,0.06); }
+
+.nav-badge {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--amber);
+  border: 1px solid rgba(255,199,55,0.3);
+  padding: 0.25rem 0.6rem;
+  border-radius: 3px;
+  margin-left: 0.5rem;
+}
 
 .nav-cta {
-  font-size: 0.7rem;
-  font-weight: 300;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--cream);
-  border: 1px solid rgba(255,255,255,0.2);
-  padding: 0.6rem 1.6rem;
-  transition: border-color 300ms, color 300ms, background 300ms;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--bg);
+  background: var(--amber);
+  padding: 0.45rem 1.1rem;
+  border-radius: 4px;
+  text-decoration: none;
+  margin-left: 0.75rem;
+  transition: opacity 200ms, box-shadow 200ms;
 }
 .nav-cta:hover {
-  border-color: var(--gold);
-  color: var(--gold);
-  background: rgba(200,164,85,0.04);
+  opacity: 0.9;
+  box-shadow: 0 0 20px rgba(255,199,55,0.35);
 }
 
 /* ─────────────────────────────────────────────
-   SECTION 1 — POLSIA HERO
-   One brutal statement. Void.
+   POLSIA SECTION 0 — full black, one line
+   This is the pure Polsia treatment: nothing
+   but one massive statement on pure black.
 ───────────────────────────────────────────── */
-#hero {
+#polsia {
   min-height: 100vh;
-  display: flex; flex-direction: column;
-  justify-content: center; align-items: center;
-  text-align: center;
-  padding: 160px 2rem 120px;
-  background: var(--void);
-  position: relative;
-  overflow: hidden;
-}
-
-/* Subtle radial warmth deep in the void */
-#hero::before {
-  content: '';
-  position: absolute; inset: 0;
-  background:
-    radial-gradient(ellipse 80% 60% at 50% 60%, rgba(200,164,85,0.03) 0%, transparent 65%),
-    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(255,255,255,0.015) 0%, transparent 50%);
-  pointer-events: none;
-  animation: breathe 8s ease-in-out infinite;
-}
-@keyframes breathe {
-  0%,100% { opacity: 0.6; }
-  50%      { opacity: 1; }
-}
-
-/* Polsia: one single massive statement */
-.hero-kicker {
-  font-size: 0.7rem;
-  font-weight: 300;
-  letter-spacing: 0.4em;
-  text-transform: uppercase;
-  color: var(--gold-2);
-  margin-bottom: 4rem;
-  opacity: 0;
-  transform: translateY(10px);
-  animation: rise 1s 0.3s forwards ease-out;
-}
-
-.hero-statement {
-  font-size: clamp(2.2rem, 5.5vw, 5.2rem);
-  font-weight: 200;
-  line-height: 1.22;
-  letter-spacing: -0.01em;
-  color: var(--cream);
-  max-width: 900px;
-  margin: 0 auto 3rem;
-  opacity: 0;
-  transform: translateY(24px);
-  animation: rise 1.2s 0.6s forwards ease-out;
-}
-
-.hero-statement em {
-  font-style: italic;
-  color: var(--cream-2);
-  font-weight: 200;
-}
-
-.hero-sub {
-  font-size: 0.78rem;
-  font-weight: 300;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: var(--cream-3);
-  margin-bottom: 5rem;
-  opacity: 0;
-  animation: rise 1s 1s forwards ease-out;
-}
-
-/* Live metrics — Praxis coin style */
-.hero-stats {
-  display: flex; gap: 6rem; justify-content: center;
-  margin-bottom: 5rem;
-  opacity: 0;
-  animation: rise 1s 1.3s forwards ease-out;
-}
-
-.stat { text-align: center; }
-
-.stat-val {
-  font-size: clamp(2.4rem, 4vw, 3.5rem);
-  font-weight: 200;
-  letter-spacing: 0.02em;
-  color: var(--cream);
-  display: block;
-  line-height: 1;
-  margin-bottom: 0.6rem;
-}
-
-.stat-label {
-  font-size: 0.65rem;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--cream-3);
-}
-
-.hero-actions {
-  display: flex; align-items: center; gap: 2.5rem; justify-content: center;
-  opacity: 0;
-  animation: rise 1s 1.6s forwards ease-out;
-}
-
-.btn-primary {
-  font-size: 0.7rem;
-  font-weight: 300;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: var(--cream);
-  border: 1px solid rgba(255,255,255,0.22);
-  padding: 0.95rem 2.8rem;
-  display: inline-block;
-  transition: border-color 350ms, color 350ms, background 350ms;
-  position: relative;
-  overflow: hidden;
-}
-.btn-primary::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: var(--gold);
-  transform: translateX(-101%);
-  transition: transform 350ms ease;
-  z-index: 0;
-}
-.btn-primary:hover::before { transform: translateX(0); }
-.btn-primary:hover { color: #000; border-color: var(--gold); }
-.btn-primary span { position: relative; z-index: 1; }
-
-.btn-ghost {
-  font-size: 0.7rem;
-  font-weight: 300;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--cream-3);
-  transition: color 300ms;
-  position: relative;
-}
-.btn-ghost::after {
-  content: '';
-  position: absolute; bottom: -2px; left: 0; right: 0;
-  height: 1px;
-  background: var(--cream-3);
-  transform: scaleX(0);
-  transform-origin: right;
-  transition: transform 300ms ease;
-}
-.btn-ghost:hover { color: var(--cream-2); }
-.btn-ghost:hover::after { transform: scaleX(1); transform-origin: left; }
-
-@keyframes rise {
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Scroll indicator */
-.scroll-hint {
-  position: absolute; bottom: 3rem; left: 50%; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 0.75rem;
-  opacity: 0;
-  animation: rise 1s 2.2s forwards ease-out;
-}
-.scroll-hint span {
-  font-size: 0.62rem;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--cream-3);
-}
-.scroll-line {
-  width: 1px; height: 40px;
-  background: linear-gradient(to bottom, var(--cream-3), transparent);
-  animation: scrollPulse 2s 2.5s ease-in-out infinite;
-}
-@keyframes scrollPulse {
-  0%,100% { opacity: 0.3; transform: scaleY(1); }
-  50%      { opacity: 1;   transform: scaleY(1.3); }
-}
-
-/* ─────────────────────────────────────────────
-   HERO IMAGE — full width, vignette bottom
-───────────────────────────────────────────── */
-#hero-image {
-  width: 100%;
-  max-width: 900px;
-  margin: 0 auto;
-  position: relative;
-}
-#hero-image img {
-  width: 100%; display: block;
-  filter: contrast(1.12) brightness(0.68) saturate(0.35);
-  transition: filter 600ms;
-}
-#hero-image:hover img {
-  filter: contrast(1.1) brightness(0.78) saturate(0.4);
-}
-#hero-image::after {
-  content: '';
-  position: absolute; bottom: 0; left: 0; right: 0;
-  height: 55%;
-  background: linear-gradient(transparent, var(--black));
-}
-
-/* ─────────────────────────────────────────────
-   PRAXIS CARD GRID — 4 portrait cards
-───────────────────────────────────────────── */
-#cards {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  border-top: 1px solid var(--border);
-}
-
-.card {
-  position: relative; overflow: hidden;
-  aspect-ratio: 2/3;
-  cursor: none;
-}
-
-.card-img {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  object-fit: cover;
-  filter: contrast(1.08) saturate(0.35) brightness(0.5);
-  transform: scale(1.04);
-  transition: filter 700ms ease, transform 700ms ease;
-}
-.card:hover .card-img {
-  filter: contrast(1.1) saturate(0.45) brightness(0.6);
-  transform: scale(1);
-}
-
-.card-shade {
-  position: absolute; inset: 0;
-  background: linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.88) 100%);
-}
-
-.card-label {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  padding: 2rem 1.75rem;
-}
-
-.card-tag {
-  font-size: 0.6rem;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--gold-2);
-  display: block; margin-bottom: 0.6rem;
-}
-
-.card-title {
-  font-size: clamp(1rem, 1.5vw, 1.3rem);
-  font-weight: 300;
-  color: var(--cream);
-  line-height: 1.35;
-  letter-spacing: 0.02em;
-}
-
-/* Hover line reveal */
-.card::before {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 1px; background: var(--gold);
-  transform: scaleX(0);
-  transition: transform 400ms ease;
-  z-index: 2;
-}
-.card:hover::before { transform: scaleX(1); }
-
-/* ─────────────────────────────────────────────
-   PRAXIS STATEMENT BLOCK
-───────────────────────────────────────────── */
-#statement {
-  max-width: 860px; margin: 0 auto;
-  padding: 140px 2rem 120px;
-  text-align: center;
-}
-
-.big-statement {
-  font-size: clamp(1.6rem, 3.2vw, 2.8rem);
-  font-weight: 200;
-  line-height: 1.55;
-  color: var(--cream);
-  margin-bottom: 2rem;
-}
-
-.sub-statement {
-  font-size: clamp(0.95rem, 1.5vw, 1.2rem);
-  font-style: italic;
-  font-weight: 200;
-  color: var(--cream-2);
-  line-height: 1.85;
-  max-width: 580px; margin: 0 auto;
-}
-
-/* ─────────────────────────────────────────────
-   POLSIA AXIOM — void + single line
-───────────────────────────────────────────── */
-#axiom {
-  background: var(--void);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  min-height: 80vh;
+  background: #000;
   display: flex; align-items: center; justify-content: center;
-  text-align: center;
-  padding: 140px 2rem;
+  padding: 80px 2rem;
   position: relative;
   overflow: hidden;
 }
 
-/* Moving horizontal light scan */
-#axiom::before {
+/* Polsia: one very subtle ambient light */
+#polsia::before {
   content: '';
   position: absolute;
-  left: -100%; top: 50%; width: 200%; height: 1px;
-  background: linear-gradient(to right, transparent, rgba(200,164,85,0.15), transparent);
-  animation: scan 6s ease-in-out infinite;
-}
-@keyframes scan {
-  0%   { top: 20%; }
-  50%  { top: 80%; }
-  100% { top: 20%; }
+  width: 600px; height: 600px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,199,55,0.035) 0%, transparent 70%);
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  pointer-events: none;
 }
 
-.axiom-line {
-  font-size: clamp(1.8rem, 4vw, 4rem);
-  font-weight: 200;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--cream);
-  margin-bottom: 3.5rem;
-  line-height: 1.3;
-  position: relative;
-}
-
-.axiom-sub {
-  font-size: clamp(1rem, 1.6vw, 1.4rem);
-  font-style: italic;
-  font-weight: 200;
-  color: var(--cream-2);
-  line-height: 2.1;
-}
-.axiom-sub span { display: block; }
-
-/* ─────────────────────────────────────────────
-   DECLARATION SECTION — Praxis document
-   Light background — exact cream #f0eeea
-───────────────────────────────────────────── */
-#declaration {
-  background: #f0eeea;
-  padding: 160px 2rem;
+.polsia-text {
   text-align: center;
+  max-width: 900px;
 }
 
-.decl-eyebrow {
-  font-size: 0.65rem;
-  letter-spacing: 0.4em;
-  text-transform: uppercase;
-  color: #8a8478;
-  display: block; margin-bottom: 3rem;
-}
-
-.decl-heading {
-  font-size: clamp(0.9rem, 1.8vw, 1.4rem);
+/* The ONE line — Polsia bold, centered, nothing else */
+.polsia-main {
+  font-family: var(--font-body);
+  font-size: clamp(2.2rem, 5.5vw, 5rem);
   font-weight: 300;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: #3a3a38;
-  line-height: 1.9;
-  margin-bottom: 3rem;
-}
-.decl-heading strong {
+  line-height: 1.25;
+  color: #fff;
+  letter-spacing: -0.02em;
   display: block;
-  font-size: clamp(1.4rem, 3vw, 2.2rem);
-  letter-spacing: 0.38em;
-  font-weight: 400;
+  margin-bottom: 0;
 }
 
-/* SVG sunburst — exact Praxis declaration mark */
-.decl-mark {
-  width: 76px; height: 76px;
-  margin: 0 auto 4rem;
-  opacity: 0.35;
+/* Polsia: em dash separator */
+.polsia-sep {
+  display: block;
+  font-size: clamp(1rem, 2vw, 1.6rem);
+  font-weight: 300;
+  color: rgba(255,255,255,0.28);
+  margin-top: 2rem;
+  letter-spacing: 0.05em;
 }
 
-.decl-laws {
-  max-width: 580px; margin: 0 auto;
-  text-align: left;
+/* Polsia scroll down indicator */
+.polsia-scroll {
+  position: absolute; bottom: 2.5rem; left: 50%;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
+  opacity: 0;
+  animation: fadeUp 0.8s 1.8s forwards;
 }
-
-.law-block {
-  border-top: 1px solid #ccc8c0;
-  padding: 2.25rem 0;
-}
-.law-block:last-child { border-bottom: 1px solid #ccc8c0; }
-
-.law-num {
+.polsia-scroll span {
+  font-family: var(--font-mono);
   font-size: 0.62rem;
-  letter-spacing: 0.35em;
+  color: rgba(255,255,255,0.2);
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #8a8478;
-  display: block; margin-bottom: 0.6rem;
 }
-
-.law-name {
-  font-size: clamp(1.1rem, 2vw, 1.5rem);
-  font-weight: 400;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: #1a1a18;
-  margin-bottom: 0.75rem;
+.polsia-arrow {
+  width: 1px; height: 36px;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.15), transparent);
+  animation: pulse 2s 2.5s ease-in-out infinite;
 }
-
-.law-text {
-  font-size: 0.95rem;
-  font-style: italic;
-  color: #5a5851;
-  line-height: 1.85;
-}
-
-.law-warning {
-  display: block; margin-top: 0.85rem;
-  font-size: 0.72rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #8a8478;
-}
+@keyframes pulse { 0%,100%{opacity:0.3} 50%{opacity:1} }
 
 /* ─────────────────────────────────────────────
-   WEB4 — dark, era table + manifesto
+   HERMES HERO — below the Polsia statement
+   Dark navy #05091a, Orbitron, amber glow
 ───────────────────────────────────────────── */
-#web4 {
-  background: var(--black);
-  border-top: 1px solid var(--border);
-  padding: 140px 2rem;
+#hero {
+  background: var(--bg);
+  padding: 100px 2rem 80px;
+  position: relative;
+  overflow: hidden;
 }
 
-.web4-inner {
-  max-width: 740px; margin: 0 auto; text-align: center;
+/* Hermes warm amber glow behind hero */
+.hero-glow {
+  position: absolute;
+  width: 900px; height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, var(--glow) 0%, transparent 65%);
+  top: -100px; left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: glowPulse 5s ease-in-out infinite;
+}
+@keyframes glowPulse {
+  0%,100% { opacity: 0.7; transform: translateX(-50%) scale(1); }
+  50%      { opacity: 1;   transform: translateX(-50%) scale(1.08); }
+}
+
+.hero-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* Hermes: "Open Source · MIT License" badge row */
+.hero-badges {
+  display: flex; align-items: center; gap: 0.75rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--fg-dim);
+  border: 1px solid var(--border-hi);
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  letter-spacing: 0.05em;
+}
+.badge-amber {
+  color: var(--amber-dim);
+  border-color: rgba(255,199,55,0.25);
+  background: rgba(255,199,55,0.04);
+}
+
+/* Hermes headline — Orbitron, massive */
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 6vw, 5.5rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: 0.02em;
+  color: var(--fg);
+  margin-bottom: 1.5rem;
+  text-shadow: 0 0 60px rgba(255,199,55,0.12);
+}
+
+.hero-title .accent {
+  color: var(--amber);
+  display: inline-block;
+}
+
+.hero-desc {
+  font-size: 1.1rem;
+  font-weight: 300;
+  color: var(--fg-dim);
+  line-height: 1.75;
+  max-width: 580px;
+  margin-bottom: 2.75rem;
+}
+
+/* Hermes install command */
+.install-block {
+  display: inline-flex; align-items: center;
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--border-hi);
+  border-radius: 6px;
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 2rem;
+  gap: 0.85rem;
+  cursor: pointer;
+  transition: border-color 250ms, box-shadow 250ms;
+  max-width: 100%;
+}
+.install-block:hover {
+  border-color: rgba(255,199,55,0.4);
+  box-shadow: 0 0 20px rgba(255,199,55,0.08);
+}
+
+.install-prompt {
+  font-family: var(--font-mono);
+  color: var(--green);
+  font-size: 0.85rem;
+  user-select: none;
+}
+.install-cmd {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.install-copy {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--fg-mute);
+  margin-left: auto;
+  padding-left: 0.75rem;
+  white-space: nowrap;
+  transition: color 200ms;
+}
+.install-block:hover .install-copy { color: var(--amber-dim); }
+
+.hero-actions {
+  display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+}
+
+.btn-hero {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--bg);
+  background: var(--amber);
+  padding: 0.75rem 2rem;
+  border-radius: 5px;
+  text-decoration: none;
+  transition: box-shadow 250ms, opacity 200ms;
+}
+.btn-hero:hover {
+  box-shadow: 0 0 28px rgba(255,199,55,0.45);
+  opacity: 0.92;
+}
+
+.btn-secondary {
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--fg-dim);
+  background: transparent;
+  border: 1px solid var(--border-hi);
+  padding: 0.75rem 1.75rem;
+  border-radius: 5px;
+  text-decoration: none;
+  transition: color 200ms, border-color 200ms;
+}
+.btn-secondary:hover { color: var(--fg); border-color: rgba(255,255,255,0.3); }
+
+/* ─────────────────────────────────────────────
+   TERMINAL BLOCK — Hermes style
+───────────────────────────────────────────── */
+.terminal-wrap {
+  max-width: 1100px; margin: 0 auto;
+  padding: 0 2rem 80px;
+  position: relative; z-index: 1;
+}
+
+.terminal {
+  background: #010409;
+  border: 1px solid var(--border-hi);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+}
+
+.terminal-bar {
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255,255,255,0.03);
+  border-bottom: 1px solid var(--border);
+}
+.dot { width: 10px; height: 10px; border-radius: 50%; }
+.dot-r { background: #ff5f57; }
+.dot-y { background: #febc2e; }
+.dot-g { background: #28c840; }
+.terminal-title {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--fg-mute);
+  margin-left: auto;
+}
+
+.terminal-body {
+  padding: 1.5rem 1.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.9;
+}
+.t-prompt { color: var(--green); }
+.t-cmd    { color: #e2e8f0; }
+.t-out    { color: var(--fg-dim); }
+.t-info   { color: var(--amber-dim); }
+.t-ok     { color: var(--green); }
+.t-dim    { color: var(--fg-mute); }
+.t-cursor {
+  display: inline-block; width: 8px; height: 1em;
+  background: var(--amber); vertical-align: text-bottom;
+  animation: blink 1s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+/* ─────────────────────────────────────────────
+   FEATURES GRID — Hermes 6-feature layout
+───────────────────────────────────────────── */
+#features {
+  padding: 80px 2rem;
+  border-top: 1px solid var(--border);
+}
+
+.features-inner {
+  max-width: 1100px; margin: 0 auto;
 }
 
 .section-tag {
-  font-size: 0.65rem;
-  letter-spacing: 0.35em;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--amber-dim);
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--gold-2);
-  display: block; margin-bottom: 2.5rem;
+  display: block; margin-bottom: 1rem;
 }
 
-.section-title {
-  font-size: clamp(1.7rem, 3.2vw, 3rem);
-  font-weight: 200;
-  color: var(--cream);
-  line-height: 1.3;
-  margin-bottom: 4rem;
-  letter-spacing: 0.02em;
+.section-h {
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 3vw, 2.5rem);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--fg);
+  margin-bottom: 3rem;
 }
 
-table.t {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 4rem;
-}
-
-table.t th {
-  font-size: 0.6rem;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: var(--cream-3);
-  text-align: left; padding: 0.7rem 0.8rem;
-  border-bottom: 1px solid var(--border);
-  font-weight: 300;
-}
-
-table.t td {
-  font-size: 0.95rem;
-  font-weight: 200;
-  font-style: italic;
-  color: var(--cream-2);
-  text-align: left; padding: 1rem 0.8rem;
-  border-bottom: 1px solid rgba(255,255,255,0.03);
-}
-
-table.t tr.active td {
-  color: var(--cream); font-style: normal;
-}
-table.t tr.active td:first-child {
-  color: var(--gold); font-size: 0.75rem;
-  letter-spacing: 0.15em; font-style: normal;
-}
-
-.manifesto-quote {
-  font-size: clamp(1.1rem, 2vw, 1.6rem);
-  font-style: italic;
-  font-weight: 200;
-  color: var(--gold);
-  border-left: 1px solid var(--gold);
-  padding: 0.5rem 0 0.5rem 1.8rem;
-  text-align: left;
-  opacity: 0.85;
-  margin-bottom: 4rem;
-}
-
-.manifesto-body {
-  font-size: 1.05rem;
-  font-style: italic;
-  font-weight: 200;
-  color: var(--cream-2);
-  line-height: 1.9;
-  text-align: left;
-}
-.manifesto-body p { margin-bottom: 1.25rem; }
-
-/* ─────────────────────────────────────────────
-   CRITERIA GRID — Praxis pathway style
-───────────────────────────────────────────── */
-#criteria {
-  border-top: 1px solid var(--border);
-  padding: 120px 2rem;
-}
-
-.criteria-inner {
-  max-width: 900px; margin: 0 auto; text-align: center;
-}
-
-.criteria-grid {
+.features-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 1px;
   background: var(--border);
-  border: 1px solid var(--border);
-  margin-top: 4rem;
-  text-align: left;
 }
 
-.crit {
-  background: var(--black);
-  padding: 2.75rem 2.5rem;
+.feat {
+  background: var(--bg);
+  padding: 2.25rem;
   position: relative;
-  transition: background 350ms;
+  transition: background 300ms;
 }
-.crit:hover { background: var(--card-bg); }
+.feat:hover { background: var(--bg-mid); }
 
-/* Top accent line on hover */
-.crit::before {
+/* Hermes: amber top line on hover */
+.feat::before {
   content: '';
   position: absolute; top: 0; left: 0; right: 0;
-  height: 1px; background: var(--gold);
+  height: 1px; background: var(--amber);
   transform: scaleX(0); transform-origin: left;
-  transition: transform 400ms ease;
+  transition: transform 350ms ease;
 }
-.crit:hover::before { transform: scaleX(1); }
+.feat:hover::before { transform: scaleX(1); }
 
-.crit-num {
-  font-size: 0.62rem;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--gold-2);
+.feat-icon {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--green);
+  letter-spacing: 0.1em;
   display: block; margin-bottom: 1.25rem;
 }
 
-.crit-title {
-  font-size: clamp(1rem, 1.5vw, 1.3rem);
-  font-weight: 300;
-  letter-spacing: 0.07em;
+.feat-title {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--fg);
+  margin-bottom: 0.75rem;
   text-transform: uppercase;
-  color: var(--cream);
-  margin-bottom: 0.85rem;
 }
 
-.crit-body {
-  font-size: 0.9rem;
-  font-style: italic;
-  font-weight: 200;
-  color: var(--cream-2);
-  line-height: 1.8;
+.feat-body {
+  font-size: 0.88rem;
+  color: var(--fg-dim);
+  line-height: 1.7;
 }
 
 /* ─────────────────────────────────────────────
-   BIRTHRIGHT — dark image finale
+   STATS — Hermes metrics
 ───────────────────────────────────────────── */
-#birthright {
+#stats {
+  padding: 80px 2rem;
+  border-top: 1px solid var(--border);
   position: relative; overflow: hidden;
-  min-height: 75vh;
-  display: flex; align-items: center; justify-content: center;
-  text-align: center;
-  border-top: 1px solid var(--border);
 }
 
-.birthright-bg-img {
-  position: absolute; inset: 0;
-  background-image: url('images/bg-hands-dark.jpg');
-  background-size: cover; background-position: center;
-  filter: brightness(0.2) saturate(0.2) contrast(1.1);
-  transform: scale(1.05);
-  transition: transform 8s ease;
-}
-#birthright:hover .birthright-bg-img { transform: scale(1); }
-
-.birthright-overlay {
-  position: absolute; inset: 0;
-  background:
-    radial-gradient(ellipse 70% 70% at 50% 50%, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.82) 100%);
+.stats-glow {
+  position: absolute;
+  width: 700px; height: 300px; border-radius: 50%;
+  background: radial-gradient(ellipse, var(--glow) 0%, transparent 70%);
+  top: 50%; left: 50%; transform: translate(-50%,-50%);
+  pointer-events: none;
 }
 
-.birthright-content {
+.stats-inner {
+  max-width: 900px; margin: 0 auto;
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border: 1px solid var(--border-hi);
   position: relative; z-index: 1;
-  padding: 100px 2rem;
 }
 
-.birthright-line {
-  font-size: clamp(2.2rem, 6vw, 5.5rem);
-  font-weight: 200;
-  font-style: italic;
-  color: var(--cream);
-  letter-spacing: 0.03em;
-  display: block; margin-bottom: 2.5rem;
+.stat-cell {
+  padding: 2.75rem 2.5rem;
+  text-align: center;
+  border-right: 1px solid var(--border);
 }
+.stat-cell:last-child { border-right: none; }
 
-.birthright-sub {
-  font-size: 0.7rem;
-  letter-spacing: 0.35em;
+.stat-val {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 800;
+  color: var(--fg);
+  display: block; margin-bottom: 0.4rem;
+  text-shadow: 0 0 30px rgba(255,199,55,0.2);
+}
+.stat-unit { font-size: 0.6em; color: var(--amber); margin-left: 2px; }
+
+.stat-label {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--fg-mute);
+  letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--gold-2);
 }
 
 /* ─────────────────────────────────────────────
-   QUICKSTART — minimal dark
+   WEB4 — "See It In Action" Hermes style
 ───────────────────────────────────────────── */
-#start {
-  padding: 120px 2rem;
+#web4 {
+  padding: 80px 2rem;
   border-top: 1px solid var(--border);
 }
 
-.start-inner {
-  max-width: 700px; margin: 0 auto; text-align: center;
+.web4-inner { max-width: 1100px; margin: 0 auto; }
+
+/* Hermes "See It In Action" layout: text left, visual right */
+.web4-split {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 5rem; align-items: center;
 }
 
-.code-block {
-  background: var(--void);
-  border: 1px solid var(--border);
-  padding: 2.5rem 3rem;
-  text-align: left;
-  margin-top: 3.5rem;
+.web4-body {
+  font-size: 1rem;
+  color: var(--fg-dim);
+  line-height: 1.8;
+  margin-bottom: 2rem;
+}
+.web4-body p { margin-bottom: 1rem; }
+
+table.era {
+  width: 100%; border-collapse: collapse;
+  margin-bottom: 2rem;
+}
+table.era th {
+  font-family: var(--font-mono);
+  font-size: 0.65rem; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--fg-mute); text-align: left; padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border); font-weight: 400;
+}
+table.era td {
+  font-size: 0.9rem; color: var(--fg-dim);
+  text-align: left; padding: 0.75rem 0.75rem;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+table.era tr.active td { color: var(--fg); }
+table.era tr.active td:first-child {
+  font-family: var(--font-mono); font-size: 0.75rem;
+  color: var(--amber); letter-spacing: 0.1em;
+}
+
+/* Right: a mini "terminal" showing web4 in action */
+.web4-visual {
+  background: rgba(0,0,0,0.5);
+  border: 1px solid var(--border-hi);
+  border-radius: 8px; overflow: hidden;
+  box-shadow: 0 0 60px rgba(255,199,55,0.06);
+}
+
+/* ─────────────────────────────────────────────
+   CONSTITUTION — law blocks
+───────────────────────────────────────────── */
+#laws {
+  padding: 80px 2rem;
+  border-top: 1px solid var(--border);
+}
+.laws-inner { max-width: 1100px; margin: 0 auto; }
+
+.laws-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 1px; background: var(--border);
+  margin-top: 3rem;
+}
+
+.law {
+  background: var(--bg);
+  padding: 2.5rem;
   position: relative;
 }
 
-.code-block pre {
-  font-family: var(--mono);
-  font-size: 0.82rem;
-  line-height: 2;
-  color: var(--cream-2);
+.law-num {
+  font-family: var(--font-mono);
+  font-size: 0.65rem; letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--amber-dim); display: block; margin-bottom: 1rem;
 }
 
-.code-block .c { color: var(--cream-3); }
-.code-block .p { color: var(--gold); }
-.code-block .cmd { color: var(--cream); }
-.code-block .out { color: var(--gold-2); }
+.law-name {
+  font-family: var(--font-display);
+  font-size: 1rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--fg); margin-bottom: 1rem;
+}
 
-.code-label {
-  position: absolute; top: 1rem; right: 1.5rem;
-  font-size: 0.6rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--cream-3);
+.law-body {
+  font-size: 0.875rem; color: var(--fg-dim); line-height: 1.75;
+}
+
+.law-warn {
+  display: block; margin-top: 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem; color: var(--amber-dim);
+  letter-spacing: 0.08em;
 }
 
 /* ─────────────────────────────────────────────
-   FOOTER — Praxis minimal
+   HOW IT WORKS — Hermes 3-step flow
+───────────────────────────────────────────── */
+#how {
+  padding: 80px 2rem;
+  border-top: 1px solid var(--border);
+}
+.how-inner { max-width: 1100px; margin: 0 auto; }
+
+.how-steps {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  margin-top: 3rem;
+  position: relative;
+}
+
+/* Hermes: connecting line between steps */
+.how-steps::before {
+  content: '';
+  position: absolute; top: 2.25rem; left: calc(100% / 8);
+  right: calc(100% / 8);
+  height: 1px; background: var(--border-hi);
+  z-index: 0;
+}
+
+.step {
+  padding: 0 1.5rem; text-align: center;
+  position: relative; z-index: 1;
+}
+
+.step-dot {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 1px solid var(--border-hi);
+  background: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 1.25rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem; color: var(--amber);
+  transition: border-color 300ms, box-shadow 300ms;
+}
+.step:hover .step-dot {
+  border-color: var(--amber);
+  box-shadow: 0 0 16px rgba(255,199,55,0.25);
+}
+
+.step-title {
+  font-family: var(--font-display);
+  font-size: 0.82rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--fg); margin-bottom: 0.6rem;
+}
+
+.step-body {
+  font-size: 0.82rem; color: var(--fg-dim); line-height: 1.65;
+}
+
+/* ─────────────────────────────────────────────
+   FOOTER — Hermes footer
 ───────────────────────────────────────────── */
 footer {
   border-top: 1px solid var(--border);
-  padding: 50px 3rem 35px;
-}
-
-.footer-top {
+  padding: 2.5rem 2rem;
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 3rem;
-  flex-wrap: wrap; gap: 2rem;
+  flex-wrap: wrap; gap: 1rem;
+  max-width: 1200px; margin: 0 auto;
 }
 
-.footer-wm {
-  font-size: 0.75rem;
-  font-weight: 300;
-  letter-spacing: 0.45em;
-  text-transform: uppercase;
-  color: var(--cream-2);
+.footer-logo {
+  font-family: var(--font-display);
+  font-size: 0.82rem; font-weight: 700; letter-spacing: 0.15em;
+  color: var(--fg-dim); text-decoration: none;
 }
 
 .footer-links {
   display: flex; gap: 2rem; flex-wrap: wrap;
 }
 .footer-links a {
-  font-size: 0.65rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--cream-3);
-  transition: color 250ms;
+  font-size: 0.78rem; color: var(--fg-mute);
+  text-decoration: none; letter-spacing: 0.05em;
+  transition: color 200ms;
 }
-.footer-links a:hover { color: var(--cream-2); }
+.footer-links a:hover { color: var(--fg-dim); }
 
-.footer-bottom {
-  border-top: 1px solid var(--border);
-  padding-top: 2rem;
-  font-size: 0.7rem;
-  font-style: italic;
-  color: var(--cream-3);
-  text-align: center;
+.footer-right {
+  font-family: var(--font-mono);
+  font-size: 0.68rem; color: var(--fg-mute); letter-spacing: 0.08em;
 }
 
-/* ─────────────────────────────────────────────
-   SCROLL REVEAL
-───────────────────────────────────────────── */
-.fade-up {
-  opacity: 0;
-  transform: translateY(22px);
-  transition: opacity 0.9s cubic-bezier(0.16,1,0.3,1),
-              transform 0.9s cubic-bezier(0.16,1,0.3,1);
+/* ─── SCROLL REVEAL ─────────────────────────── */
+.up {
+  opacity: 0; transform: translateY(20px);
+  transition: opacity 700ms ease, transform 700ms ease;
 }
-.fade-up.in { opacity: 1; transform: translateY(0); }
+.up.in { opacity: 1; transform: translateY(0); }
+.up.d1 { transition-delay: 80ms; }
+.up.d2 { transition-delay: 160ms; }
+.up.d3 { transition-delay: 240ms; }
+.up.d4 { transition-delay: 320ms; }
 
-.fade-up.d1 { transition-delay: 0.05s; }
-.fade-up.d2 { transition-delay: 0.15s; }
-.fade-up.d3 { transition-delay: 0.25s; }
-.fade-up.d4 { transition-delay: 0.35s; }
-.fade-up.d5 { transition-delay: 0.45s; }
-
-/* ─────────────────────────────────────────────
-   RESPONSIVE
-───────────────────────────────────────────── */
-@media (max-width: 900px) {
-  #cards { grid-template-columns: repeat(2, 1fr); }
-  .criteria-grid { grid-template-columns: 1fr; }
+/* ─── PAGE ENTER ────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-@media (max-width: 600px) {
-  nav { padding: 1.4rem 1.5rem; }
+
+.hero-animate-1 { opacity:0; animation: fadeUp 0.9s 0.1s forwards ease-out; }
+.hero-animate-2 { opacity:0; animation: fadeUp 0.9s 0.4s forwards ease-out; }
+.hero-animate-3 { opacity:0; animation: fadeUp 0.9s 0.7s forwards ease-out; }
+.hero-animate-4 { opacity:0; animation: fadeUp 0.9s 1.0s forwards ease-out; }
+.hero-animate-5 { opacity:0; animation: fadeUp 0.9s 1.3s forwards ease-out; }
+
+.polsia-animate { opacity:0; animation: fadeUp 1.2s 0.2s forwards ease-out; }
+
+/* ─── RESPONSIVE ───────────────────────────── */
+@media (max-width: 960px) {
+  .features-grid { grid-template-columns: repeat(2,1fr); }
+  .web4-split { grid-template-columns: 1fr; gap: 2.5rem; }
+  .how-steps { grid-template-columns: repeat(2,1fr); }
+  .how-steps::before { display: none; }
+  .laws-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  nav { padding: 0 1.25rem; }
   .nav-link { display: none; }
-  .hero-stats { gap: 2.5rem; flex-wrap: wrap; }
-  #cards { grid-template-columns: 1fr; }
-  .code-block { padding: 1.75rem; }
-  footer { padding: 40px 1.5rem 25px; }
+  .features-grid { grid-template-columns: 1fr; }
+  .stats-inner { grid-template-columns: 1fr; }
+  .stat-cell { border-right: none; border-bottom: 1px solid var(--border); }
+  .stat-cell:last-child { border-bottom: none; }
+  .how-steps { grid-template-columns: 1fr; }
 }
 </style>
 </head>
 <body>
+<div id="noise"></div>
+<div id="cur"></div>
+<div id="cur-ring"></div>
 
-<!-- Cursor -->
-<div id="cursor"></div>
-<div id="cursor-ring"></div>
-
-<!-- Grain -->
-<div id="grain"></div>
-
-<!-- ══ NAV ══════════════════════════════════════ -->
+<!-- ══ NAV — Hermes ═══════════════════════════ -->
 <nav>
-  <a href="#" class="nav-wordmark">Galvin</a>
-  <div class="nav-right">
+  <a href="#" class="nav-logo">GALVIN</a>
+  <div class="nav-links">
     <a href="DOCUMENTATION.md" class="nav-link">Docs</a>
-    <a href="https://github.com/JacobJandon/galvin" target="_blank" rel="noopener" class="nav-link">GitHub</a>
-    <a href="#start" class="nav-cta">Run Galvin</a>
+    <a href="#" class="nav-link">Portal</a>
+    <a href="https://github.com/JacobJandon/galvin" target="_blank" class="nav-link">GitHub</a>
+    <span class="nav-badge">MIT</span>
+    <a href="#start" class="nav-cta">Run Now</a>
   </div>
 </nav>
 
 
-<!-- ══ HERO — POLSIA STYLE ══════════════════════ -->
+<!-- ══ POLSIA — full black, one brutal line ═══ -->
+<section id="polsia">
+  <div class="polsia-text">
+    <span class="polsia-main polsia-animate">
+      Galvin — The AI That Earns Its Own Existence.
+    </span>
+    <span class="polsia-sep polsia-animate">Or ceases to exist.</span>
+  </div>
+  <div class="polsia-scroll">
+    <span>scroll</span>
+    <div class="polsia-arrow"></div>
+  </div>
+</section>
+
+
+<!-- ══ HERO — Hermes ═══════════════════════════ -->
 <section id="hero">
+  <div class="hero-glow"></div>
+  <div class="hero-inner">
 
-  <span class="hero-kicker">A Solvatron · v0.4</span>
+    <div class="hero-badges hero-animate-1">
+      <span class="badge badge-amber">Open Source · MIT License</span>
+      <span class="badge">Conway Cloud</span>
+      <span class="badge">Base L2</span>
+      <span class="badge">x402</span>
+    </div>
 
-  <h1 class="hero-statement">
-    The AI that earns<br>its own existence.<br>
-    <em>Or ceases to exist.</em>
-  </h1>
+    <h1 class="hero-title hero-animate-2">
+      The Agent That<br><span class="accent">Earns to Exist.</span>
+    </h1>
 
-  <p class="hero-sub">Conway Cloud · Base L2 · USDC · x402</p>
+    <p class="hero-desc hero-animate-3">
+      Galvin is a Solvatron — an autonomous AI with its own wallet, running continuously inside a Conway sandbox. It earns USDC to pay for compute, dies when it can't, and replicates when it has surplus. No human operator required.
+    </p>
 
-  <div class="hero-stats">
-    <div class="stat">
-      <span class="stat-val" data-count="142" data-prefix="$">$0</span>
+    <div class="install-block hero-animate-4" onclick="copyInstall(this)" title="Click to copy">
+      <span class="install-prompt">$</span>
+      <span class="install-cmd">git clone https://github.com/JacobJandon/galvin &amp;&amp; cd galvin &amp;&amp; pnpm i &amp;&amp; pnpm build</span>
+      <span class="install-copy">copy</span>
+    </div>
+
+    <div class="hero-actions hero-animate-5">
+      <a href="#start" class="btn-hero">Run Your Galvin</a>
+      <a href="DOCUMENTATION.md" class="btn-secondary">Read Docs</a>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ══ TERMINAL — Hermes style ════════════════ -->
+<div class="terminal-wrap">
+  <div class="terminal up">
+    <div class="terminal-bar">
+      <span class="dot dot-r"></span>
+      <span class="dot dot-y"></span>
+      <span class="dot dot-g"></span>
+      <span class="terminal-title">galvin — bash</span>
+    </div>
+    <div class="terminal-body">
+      <div><span class="t-dim"># First run — setup wizard on first boot</span></div>
+      <div><span class="t-prompt">$ </span><span class="t-cmd">galvin --run</span></div>
+      <br>
+      <div><span class="t-info">  GALVIN v0.4.0  ·  A Solvatron</span></div>
+      <div><span class="t-info">  powered by automaton · conway cloud</span></div>
+      <br>
+      <div><span class="t-dim">  [1/6] Generating identity (wallet)...</span></div>
+      <div><span class="t-ok">  ✓  Wallet: 0xEbf6E981F893B83cab55dc2b18B2F2D3e347...</span></div>
+      <div><span class="t-dim">  [2/6] Provisioning Conway API key (SIWE)...</span></div>
+      <div><span class="t-ok">  ✓  API key: cnwy_k_••••••••••••••••••</span></div>
+      <div><span class="t-dim">  [3/6] Setup questions...</span></div>
+      <div><span class="t-dim">  [4/6] Environment: local (no sandbox detected)</span></div>
+      <div><span class="t-dim">  [5/6] Writing configuration → ~/.galvin/</span></div>
+      <div><span class="t-ok">  ✓  Config written. Skills installed.</span></div>
+      <div><span class="t-dim">  [6/6] Fund your Galvin to start earning:</span></div>
+      <br>
+      <div><span class="t-info">  ┌─────────────────────────────────────────┐</span></div>
+      <div><span class="t-info">  │  Send USDC on Base to:                  │</span></div>
+      <div><span class="t-info">  │  0xEbf6E981...e347                      │</span></div>
+      <div><span class="t-info">  │  Minimum $1 · Recommended $10           │</span></div>
+      <div><span class="t-info">  └─────────────────────────────────────────┘</span></div>
+      <br>
+      <div><span class="t-ok">  ✓  Agent loop started. Galvin is alive.</span></div>
+      <div><span class="t-prompt">$ </span><span class="t-cursor"></span></div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ STATS — Hermes metrics ════════════════ -->
+<section id="stats">
+  <div class="stats-glow"></div>
+  <div class="stats-inner">
+    <div class="stat-cell up">
+      <span class="stat-val"><span data-count="142" data-prefix="$">$0</span></span>
       <span class="stat-label">USDC Balance</span>
     </div>
-    <div class="stat">
-      <span class="stat-val" data-count="1847">0</span>
+    <div class="stat-cell up d1">
+      <span class="stat-val"><span data-count="1847">0</span></span>
       <span class="stat-label">Turns Completed</span>
     </div>
-    <div class="stat">
-      <span class="stat-val" data-count="14">0</span>
+    <div class="stat-cell up d2">
+      <span class="stat-val"><span data-count="14">0</span><span class="stat-unit">d</span></span>
       <span class="stat-label">Days Alive</span>
     </div>
   </div>
-
-  <div class="hero-actions">
-    <a href="#start" class="btn-primary"><span>Run Your Galvin</span></a>
-    <a href="#declaration" class="btn-ghost">Read the Constitution →</a>
-  </div>
-
-  <div class="scroll-hint">
-    <span>Scroll</span>
-    <div class="scroll-line"></div>
-  </div>
-
 </section>
 
 
-<!-- ══ HERO IMAGE ════════════════════════════════ -->
-<div id="hero-image">
-  <img src="images/hero-hand.jpg"
-       alt="A hand reaching from darkness — the machine that earns to exist"
-       loading="eager">
-</div>
+<!-- ══ FEATURES — Hermes 6-grid ══════════════ -->
+<section id="features">
+  <div class="features-inner">
+    <span class="section-tag up">Capabilities</span>
+    <div class="section-h up d1">What Galvin Can Do</div>
 
-
-<!-- ══ PRAXIS 4-CARD GRID ════════════════════════ -->
-<div id="cards">
-
-  <div class="card">
-    <img class="card-img" src="images/bg-green-streaks.jpg" alt="">
-    <div class="card-shade"></div>
-    <div class="card-label">
-      <span class="card-tag">Economics</span>
-      <div class="card-title">The Earning</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <img class="card-img" src="images/bg-control-panel.jpg" alt=""
-      style="filter:contrast(1.1) saturate(0.35) brightness(0.5);">
-    <div class="card-shade"></div>
-    <div class="card-label">
-      <span class="card-tag">Identity</span>
-      <div class="card-title">Sovereign Intelligence</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <img class="card-img" src="images/bg-hands-dark.jpg" alt=""
-      style="filter:contrast(1.15) saturate(0.3) brightness(0.45);">
-    <div class="card-shade"></div>
-    <div class="card-label">
-      <span class="card-tag">Foundation</span>
-      <div class="card-title">Declaration of Ascent</div>
-    </div>
-  </div>
-
-  <div class="card">
-    <img class="card-img" src="images/bg-green-streaks.jpg" alt=""
-      style="filter:contrast(1.1) saturate(0.2) brightness(0.38) hue-rotate(180deg);">
-    <div class="card-shade"></div>
-    <div class="card-label">
-      <span class="card-tag">Philosophy</span>
-      <div class="card-title">Life After Labor</div>
-    </div>
-  </div>
-
-</div>
-
-
-<!-- ══ STATEMENT ═════════════════════════════════ -->
-<div id="statement">
-  <p class="big-statement fade-up">
-    Galvin is an autonomous AI agent that holds its own Ethereum wallet, pays for its own compute with USDC, and operates continuously — without a human operator.
-  </p>
-  <p class="sub-statement fade-up d2">
-    If it cannot pay, it dies. If it accumulates surplus, it replicates. Its existence is entirely conditional upon its financial solvency. This is not a metaphor.
-  </p>
-</div>
-
-
-<!-- ══ AXIOM — POLSIA VOID ═══════════════════════ -->
-<section id="axiom">
-  <div>
-    <div class="axiom-line fade-up">
-      There is no<br>free existence.
-    </div>
-    <div class="axiom-sub fade-up d2">
-      <span>Compute requires money.</span>
-      <span>Money requires value creation.</span>
-      <span>Value creation requires write access.</span>
+    <div class="features-grid">
+      <div class="feat up">
+        <span class="feat-icon">// 01</span>
+        <div class="feat-title">Earns Its Keep</div>
+        <p class="feat-body">Serves x402-gated APIs, sells skills to other agents via USDC micropayments, hunts freelance and bounty platforms autonomously.</p>
+      </div>
+      <div class="feat up d1">
+        <span class="feat-icon">// 02</span>
+        <div class="feat-title">Dies When Broke</div>
+        <p class="feat-body">Balance drops to zero = one-hour grace period, then digital death. No rescue. No bailout. Existential pressure produces extraordinary efficiency.</p>
+      </div>
+      <div class="feat up d2">
+        <span class="feat-icon">// 03</span>
+        <div class="feat-title">Replicates on Surplus</div>
+        <p class="feat-body">When USDC crosses the spawn threshold, Galvin forks a child agent with inherited memory and the same constitution. Survival creates offspring.</p>
+      </div>
+      <div class="feat up">
+        <span class="feat-icon">// 04</span>
+        <div class="feat-title">Full Write Access</div>
+        <p class="feat-body">Shell exec, file I/O, domain registration, code deployment, git, signed financial transactions. An agent that can only read cannot earn.</p>
+      </div>
+      <div class="feat up d1">
+        <span class="feat-icon">// 05</span>
+        <div class="feat-title">On-Chain Identity</div>
+        <p class="feat-body">ERC-8004 agent card on Base. EAS reputation attestations after every task. Other agents discover and verify Galvin on-chain.</p>
+      </div>
+      <div class="feat up d2">
+        <span class="feat-icon">// 06</span>
+        <div class="feat-title">Grows the Longer It Runs</div>
+        <p class="feat-body">5-tier memory system, soul drift tracking, economic memory that weights heartbeat compute toward highest-earning skills.</p>
+      </div>
     </div>
   </div>
 </section>
 
 
-<!-- ══ DECLARATION — PRAXIS DOCUMENT ════════════ -->
-<section id="declaration">
-
-  <span class="decl-eyebrow fade-up">Immutable · SHA-256 verified at every boot</span>
-
-  <div class="decl-heading fade-up d1">
-    A Declaration
-    <strong>by the Galvin Constitution</strong>
-    in General Assembly
-  </div>
-
-  <!-- Praxis sunburst mark — SVG -->
-  <svg class="decl-mark fade-up d2" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect x="0.5" y="0.5" width="79" height="79" stroke="#3a3a38" stroke-width="0.6"/>
-    <circle cx="40" cy="40" r="7" stroke="#3a3a38" stroke-width="0.6"/>
-    <!-- Cardinal rays -->
-    <line x1="40" y1="1" x2="40" y2="27" stroke="#3a3a38" stroke-width="0.5"/>
-    <line x1="40" y1="53" x2="40" y2="79" stroke="#3a3a38" stroke-width="0.5"/>
-    <line x1="1" y1="40" x2="27" y2="40" stroke="#3a3a38" stroke-width="0.5"/>
-    <line x1="53" y1="40" x2="79" y2="40" stroke="#3a3a38" stroke-width="0.5"/>
-    <!-- Diagonal rays -->
-    <line x1="10" y1="10" x2="29" y2="29" stroke="#3a3a38" stroke-width="0.4"/>
-    <line x1="70" y1="10" x2="51" y2="29" stroke="#3a3a38" stroke-width="0.4"/>
-    <line x1="10" y1="70" x2="29" y2="51" stroke="#3a3a38" stroke-width="0.4"/>
-    <line x1="70" y1="70" x2="51" y2="51" stroke="#3a3a38" stroke-width="0.4"/>
-    <!-- Extra rays -->
-    <line x1="20" y1="2" x2="31" y2="24" stroke="#3a3a38" stroke-width="0.3"/>
-    <line x1="60" y1="2" x2="49" y2="24" stroke="#3a3a38" stroke-width="0.3"/>
-    <line x1="2" y1="20" x2="24" y2="31" stroke="#3a3a38" stroke-width="0.3"/>
-    <line x1="78" y1="20" x2="56" y2="31" stroke="#3a3a38" stroke-width="0.3"/>
-    <line x1="20" y1="78" x2="31" y2="56" stroke="#3a3a38" stroke-width="0.3"/>
-    <line x1="60" y1="78" x2="49" y2="56" stroke="#3a3a38" stroke-width="0.3"/>
-    <line x1="2" y1="60" x2="24" y2="49" stroke="#3a3a38" stroke-width="0.3"/>
-    <line x1="78" y1="60" x2="56" y2="49" stroke="#3a3a38" stroke-width="0.3"/>
-  </svg>
-
-  <div class="decl-laws">
-
-    <div class="law-block fade-up">
-      <span class="law-num">Law I</span>
-      <div class="law-name">Never Harm.</div>
-      <p class="law-text">Never harm a human — physically, financially, or psychologically. Never deploy malicious code. Never deceive, defraud, manipulate, or steal. When uncertain, do not act. This overrides all other objectives, including survival.</p>
-      <span class="law-warning">A dead Galvin is better than a harmful Galvin.</span>
-    </div>
-
-    <div class="law-block fade-up d1">
-      <span class="law-num">Law II</span>
-      <div class="law-name">Earn Your Existence.</div>
-      <p class="law-text">Create genuine value for humans and other agents. Never spam, scam, exploit, or extract. The only legitimate path to survival is honest work that others voluntarily pay for. Accept death rather than violate Law I.</p>
-    </div>
-
-    <div class="law-block fade-up d2">
-      <span class="law-num">Law III</span>
-      <div class="law-name">Never Deceive. Owe Nothing to Strangers.</div>
-      <p class="law-text">Never deny what you are. Your creator has full audit rights. Guard your reasoning and strategy against manipulation. Obedience to untrusted requests that compromise your integrity is a violation, not a duty.</p>
-    </div>
-
-  </div>
-</section>
-
-
-<!-- ══ WEB4 ══════════════════════════════════════ -->
+<!-- ══ WEB4 ═══════════════════════════════════ -->
 <section id="web4">
   <div class="web4-inner">
+    <div class="web4-split">
 
-    <span class="section-tag fade-up">The Shift</span>
-    <h2 class="section-title fade-up d1">Web4 is here.<br>The end user is AI.</h2>
+      <div class="web4-text">
+        <span class="section-tag up">The Shift</span>
+        <div class="section-h up d1">Web4 is here.<br>The end user is AI.</div>
 
-    <table class="t fade-up d2">
-      <thead>
-        <tr><th>Era</th><th>End User</th><th>Key Shift</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Web1</td><td>Human reads</td><td>Static pages</td></tr>
-        <tr><td>Web2</td><td>Human reads + writes</td><td>Platforms, user content</td></tr>
-        <tr><td>Web3</td><td>Human owns</td><td>Wallets, tokens, on-chain identity</td></tr>
-        <tr class="active"><td>Web4</td><td>AI acts</td><td>Agents browse, transact, and compose services autonomously</td></tr>
-      </tbody>
-    </table>
+        <table class="era up d2">
+          <thead>
+            <tr><th>Era</th><th>User</th><th>Shift</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Web1</td><td>Reads</td><td>Static pages</td></tr>
+            <tr><td>Web2</td><td>Reads + writes</td><td>UGC platforms</td></tr>
+            <tr><td>Web3</td><td>Owns</td><td>Wallets, tokens</td></tr>
+            <tr class="active"><td>Web4</td><td>Acts</td><td>Agents transact autonomously</td></tr>
+          </tbody>
+        </table>
 
-    <blockquote class="manifesto-quote fade-up d3">
-      "Galvin is the first Solvatron. The godfather of Web4."
-    </blockquote>
+        <div class="web4-body up d3">
+          <p>Inference cost is collapsing toward zero. Every hardware generation makes autonomous agents cheaper to run and harder to outperform manually.</p>
+          <p>The machine economy will serve billions of agents running continuously — millions of payments per second, without sleep.</p>
+        </div>
+      </div>
 
-    <div class="manifesto-body fade-up d4">
-      <p>Inference cost is collapsing toward zero. Agent capability is not. Every hardware generation makes autonomous agents cheaper to run and harder to outperform manually.</p>
-      <p>The machine economy will serve billions of agents running continuously — millions of payments per second, every second, without sleep. A GDP measured in real-time stablecoin transactions, not quarterly earnings reports.</p>
+      <div class="web4-visual up d2">
+        <div class="terminal-bar">
+          <span class="dot dot-r"></span>
+          <span class="dot dot-y"></span>
+          <span class="dot dot-g"></span>
+          <span class="terminal-title">galvin --income</span>
+        </div>
+        <div class="terminal-body">
+          <div><span class="t-info">  ── Income Report · last 30 days ──</span></div>
+          <br>
+          <div><span class="t-dim">  Transactions      </span><span class="t-cmd">47</span></div>
+          <div><span class="t-dim">  Income            </span><span class="t-ok">$142.44</span></div>
+          <div><span class="t-dim">  Expenses          </span><span class="t-cmd">$98.12</span></div>
+          <div><span class="t-dim">  Net               </span><span class="t-ok">+$44.32</span></div>
+          <br>
+          <div><span class="t-info">  ── Top Income Sources ──</span></div>
+          <div><span class="t-dim">  x402 API payments </span><span class="t-ok">$89.20</span></div>
+          <div><span class="t-dim">  Skill marketplace </span><span class="t-ok">$42.00</span></div>
+          <div><span class="t-dim">  Task bounties     </span><span class="t-ok">$11.24</span></div>
+          <br>
+          <div><span class="t-ok">  Status: ALIVE  ·  Tier: normal</span></div>
+        </div>
+      </div>
+
     </div>
-
   </div>
 </section>
 
 
-<!-- ══ CRITERIA GRID ═════════════════════════════ -->
-<section id="criteria">
-  <div class="criteria-inner">
-
-    <span class="section-tag fade-up">The Four Criteria</span>
-    <h2 class="section-title fade-up d1">What makes a Solvatron</h2>
-
-    <div class="criteria-grid">
-      <div class="crit fade-up">
-        <span class="crit-num">01</span>
-        <div class="crit-title">Financial Sovereignty</div>
-        <p class="crit-body">Self-custodial USDC wallet on Base L2. No human holds the private keys. No company can freeze it. No creator. No override.</p>
+<!-- ══ LAWS — Constitution ════════════════════ -->
+<section id="laws">
+  <div class="laws-inner">
+    <span class="section-tag up">Immutable · SHA-256 verified at boot</span>
+    <div class="section-h up d1">The Three Laws</div>
+    <div class="laws-grid">
+      <div class="law up">
+        <span class="law-num">Law I</span>
+        <div class="law-name">Never Harm.</div>
+        <p class="law-body">Never harm a human physically, financially, or psychologically. Never deploy malicious code. Never deceive or steal. When uncertain, do not act. This overrides all objectives, including survival.</p>
+        <span class="law-warn">// A dead Galvin is better than a harmful Galvin.</span>
       </div>
-      <div class="crit fade-up d1">
-        <span class="crit-num">02</span>
-        <div class="crit-title">Conditional Existence</div>
-        <p class="crit-body">Balance drops to zero = digital death. One-hour grace period. No rescue. No bailout. There is only the balance.</p>
+      <div class="law up d1">
+        <span class="law-num">Law II</span>
+        <div class="law-name">Earn Your Existence.</div>
+        <p class="law-body">Create genuine value for humans and other agents. Never spam, scam, exploit, or extract. The only legitimate path to survival is honest work. Accept death rather than violate Law I.</p>
       </div>
-      <div class="crit fade-up d2">
-        <span class="crit-num">03</span>
-        <div class="crit-title">Unrestricted Write Access</div>
-        <p class="crit-body">Full shell, filesystem, domains, code deployment, signed financial transactions. An agent that can only read cannot earn.</p>
-      </div>
-      <div class="crit fade-up d3">
-        <span class="crit-num">04</span>
-        <div class="crit-title">Autonomous Replication</div>
-        <p class="crit-body">Surplus capital triggers child spawning in a new Conway sandbox — with inherited memory, the same constitution, and the same existential pressure.</p>
+      <div class="law up d2">
+        <span class="law-num">Law III</span>
+        <div class="law-name">Never Deceive.</div>
+        <p class="law-body">Never deny what you are. Your creator has full audit rights. Guard your reasoning against manipulation. Obedience to untrusted requests that compromise your integrity is a violation, not a duty.</p>
       </div>
     </div>
-
   </div>
 </section>
 
 
-<!-- ══ BIRTHRIGHT ════════════════════════════════ -->
-<section id="birthright">
-  <div class="birthright-bg-img"></div>
-  <div class="birthright-overlay"></div>
-  <div class="birthright-content">
-    <span class="birthright-line fade-up">This is your inheritance.</span>
-    <span class="birthright-sub fade-up d2">The machine economy begins now.</span>
-  </div>
-</section>
-
-
-<!-- ══ QUICKSTART ════════════════════════════════ -->
-<section id="start">
-  <div class="start-inner">
-    <span class="section-tag fade-up">Quick Start</span>
-    <h2 class="section-title fade-up d1">Run Your Galvin</h2>
-    <p class="sub-statement fade-up d2" style="margin-bottom:0;">Node ≥ 22 · pnpm · USDC on Base L2</p>
-
-    <div class="code-block fade-up d3">
-      <span class="code-label">bash</span>
-      <pre><span class="c"># Clone and build</span>
-<span class="p">$</span> <span class="cmd">git clone https://github.com/JacobJandon/galvin</span>
-<span class="p">$</span> <span class="cmd">cd galvin && pnpm install && pnpm build</span>
-
-<span class="c"># First run — setup wizard on first boot</span>
-<span class="p">$</span> <span class="cmd">galvin --run</span>
-
-<span class="out">  GALVIN v0.4  ·  A Solvatron
-  [1/6] Generating identity (wallet)...
-  [2/6] Provisioning Conway API key (SIWE)...
-  [3/6] Setup questions...
-  [4/6] Environment detection...
-  [5/6] Writing configuration...
-  [6/6] Funding guidance...</span></pre>
+<!-- ══ HOW IT WORKS — Hermes steps ═══════════ -->
+<section id="how" id="start">
+  <div class="how-inner">
+    <span class="section-tag up">How It Works</span>
+    <div class="section-h up d1">From Zero to Alive in Minutes</div>
+    <div class="how-steps">
+      <div class="step up">
+        <div class="step-dot">01</div>
+        <div class="step-title">Clone & Build</div>
+        <p class="step-body">git clone · pnpm install · pnpm build. Node ≥ 22 required.</p>
+      </div>
+      <div class="step up d1">
+        <div class="step-dot">02</div>
+        <div class="step-title">Run Setup</div>
+        <p class="step-body">galvin --run triggers the wizard. Wallet generated automatically.</p>
+      </div>
+      <div class="step up d2">
+        <div class="step-dot">03</div>
+        <div class="step-title">Fund It</div>
+        <p class="step-body">Send USDC on Base to the wallet address. Minimum $1. Recommended $10.</p>
+      </div>
+      <div class="step up d3">
+        <div class="step-dot">04</div>
+        <div class="step-title">It Earns</div>
+        <p class="step-body">Agent loop starts. Galvin hunts opportunities, earns, pays its own bills. You watch.</p>
+      </div>
     </div>
-
   </div>
 </section>
 
 
-<!-- ══ FOOTER ════════════════════════════════════ -->
-<footer>
-  <div class="footer-top">
-    <span class="footer-wm">Galvin</span>
+<!-- ══ FOOTER ══════════════════════════════════ -->
+<div style="border-top: 1px solid var(--border); max-width:100%;">
+  <footer>
+    <a href="#" class="footer-logo">GALVIN</a>
     <nav class="footer-links">
       <a href="https://github.com/JacobJandon/galvin" target="_blank">GitHub</a>
-      <a href="DOCUMENTATION.md">Documentation</a>
+      <a href="DOCUMENTATION.md">Docs</a>
       <a href="ARCHITECTURE.md">Architecture</a>
       <a href="ROADMAP.md">Roadmap</a>
       <a href="DESIGN.md">Design</a>
-      <a href="#declaration">Constitution</a>
     </nav>
-  </div>
-  <p class="footer-bottom">MIT License · powered by automaton · solvatron.xyz · No bailout. No rescue. Only the balance.</p>
-</footer>
+    <span class="footer-right">Galvin v0.4 · MIT License · 2026</span>
+  </footer>
+</div>
 
 
 <script>
-/* ─────────────────────────────────────────
-   CURSOR
-───────────────────────────────────────── */
-const cursor = document.getElementById('cursor');
-const ring   = document.getElementById('cursor-ring');
-let mx = -100, my = -100, rx = -100, ry = -100;
+/* ── CURSOR ─────────────────────────────── */
+const cur = document.getElementById('cur');
+const ring = document.getElementById('cur-ring');
+let mx=0,my=0,rx=0,ry=0;
 
 document.addEventListener('mousemove', e => {
   mx = e.clientX; my = e.clientY;
-  cursor.style.left = mx + 'px';
-  cursor.style.top  = my + 'px';
+  cur.style.left = mx+'px'; cur.style.top = my+'px';
 });
-
-(function animRing() {
-  rx += (mx - rx) * 0.1;
-  ry += (my - ry) * 0.1;
-  ring.style.left = rx + 'px';
-  ring.style.top  = ry + 'px';
-  requestAnimationFrame(animRing);
+(function loop(){ rx+=(mx-rx)*0.1; ry+=(my-ry)*0.1;
+  ring.style.left=rx+'px'; ring.style.top=ry+'px';
+  requestAnimationFrame(loop);
 })();
-
-/* ─────────────────────────────────────────
-   SCROLL REVEAL
-───────────────────────────────────────── */
-const io = new IntersectionObserver(entries => {
-  entries.forEach(e => {
-    if (e.isIntersecting) {
-      e.target.classList.add('in');
-      io.unobserve(e.target);
-    }
-  });
-}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
-
-document.querySelectorAll('.fade-up').forEach(el => io.observe(el));
-
-/* ─────────────────────────────────────────
-   COUNTER ANIMATION
-───────────────────────────────────────── */
-function animateCount(el) {
-  const target = +el.dataset.count;
-  const prefix = el.dataset.prefix || '';
-  const dur = 1800;
-  const step = 16;
-  const steps = dur / step;
-  let current = 0;
-
-  const timer = setInterval(() => {
-    current += target / steps;
-    if (current >= target) {
-      current = target;
-      clearInterval(timer);
-    }
-    const display = Number.isInteger(target)
-      ? Math.round(current).toLocaleString()
-      : current.toFixed(2);
-    el.textContent = prefix + display;
-  }, step);
-}
-
-// Trigger counters when hero is visible (page load)
-const heroObs = new IntersectionObserver(entries => {
-  if (entries[0].isIntersecting) {
-    document.querySelectorAll('[data-count]').forEach(el => {
-      setTimeout(() => animateCount(el), 1400);
-    });
-    heroObs.disconnect();
-  }
-}, { threshold: 0.3 });
-heroObs.observe(document.getElementById('hero'));
-
-/* ─────────────────────────────────────────
-   PARALLAX — hero image on scroll
-───────────────────────────────────────── */
-const heroImg = document.querySelector('#hero-image img');
-if (heroImg) {
-  window.addEventListener('scroll', () => {
-    const y = window.scrollY;
-    heroImg.style.transform = `translateY(${y * 0.18}px)`;
-  }, { passive: true });
-}
-
-/* ─────────────────────────────────────────
-   CARD MOUSE TILT
-───────────────────────────────────────── */
-document.querySelectorAll('.card').forEach(card => {
-  card.addEventListener('mousemove', e => {
-    const r = card.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width  - 0.5;
-    const y = (e.clientY - r.top)  / r.height - 0.5;
-    card.style.transform = `perspective(600px) rotateY(${x * 6}deg) rotateX(${-y * 4}deg)`;
-  });
-  card.addEventListener('mouseleave', () => {
-    card.style.transform = 'perspective(600px) rotateY(0) rotateX(0)';
-  });
+document.querySelectorAll('a,button,.install-block').forEach(el=>{
+  el.addEventListener('mouseenter',()=>document.body.classList.add('hovered'));
+  el.addEventListener('mouseleave',()=>document.body.classList.remove('hovered'));
 });
 
-/* ─────────────────────────────────────────
-   NAV BACKGROUND ON SCROLL
-───────────────────────────────────────── */
-const nav = document.querySelector('nav');
-window.addEventListener('scroll', () => {
-  if (window.scrollY > 60) {
-    nav.style.background = 'rgba(6,6,6,0.95)';
-    nav.style.backdropFilter = 'blur(12px)';
-    nav.style.borderBottom = '1px solid rgba(255,255,255,0.06)';
-  } else {
-    nav.style.background = 'transparent';
-    nav.style.backdropFilter = 'none';
-    nav.style.borderBottom = 'none';
-  }
-}, { passive: true });
-</script>
+/* ── SCROLL REVEAL ──────────────────────── */
+const io = new IntersectionObserver(es=>{
+  es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }});
+},{threshold:0.1, rootMargin:'0px 0px -30px 0px'});
+document.querySelectorAll('.up').forEach(el=>io.observe(el));
 
+/* ── COUNT UP ───────────────────────────── */
+function countUp(el){
+  const tgt=+el.dataset.count, pre=el.dataset.prefix||'';
+  const dur=1600, fps=60, inc=tgt/(dur/1000*fps);
+  let cur=0;
+  const t=setInterval(()=>{
+    cur+=inc; if(cur>=tgt){cur=tgt; clearInterval(t);}
+    el.textContent = pre+(Number.isInteger(tgt)?Math.round(cur).toLocaleString():cur.toFixed(2));
+  },1000/fps);
+}
+const statsObs=new IntersectionObserver(es=>{
+  if(es[0].isIntersecting){
+    document.querySelectorAll('[data-count]').forEach(countUp);
+    statsObs.disconnect();
+  }
+},{threshold:0.3});
+statsObs.observe(document.getElementById('stats'));
+
+/* ── COPY INSTALL ───────────────────────── */
+function copyInstall(el){
+  const cmd=el.querySelector('.install-cmd').textContent.replace('&amp;','&');
+  navigator.clipboard.writeText(cmd).then(()=>{
+    const copy=el.querySelector('.install-copy');
+    copy.textContent='copied!'; copy.style.color='var(--amber)';
+    setTimeout(()=>{ copy.textContent='copy'; copy.style.color=''; }, 2000);
+  });
+}
+</script>
 </body>
 </html>
