@@ -253,8 +253,42 @@
     .hero-image img {
       width: 100%;
       display: block;
-      filter: contrast(1.05) saturate(0.88);
-      box-shadow: 0 0 100px rgba(0,0,0,0.95), 0 0 40px rgba(0,255,65,0.05);
+      filter: contrast(1.08) saturate(0.6) brightness(0.9);
+      box-shadow: 0 0 120px rgba(0,0,0,0.97), 0 0 60px rgba(0,255,65,0.07);
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Green tint overlay on hero image — machine touch */
+    .hero-image {
+      position: relative;
+    }
+    .hero-image::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(to bottom,
+        rgba(0,255,65,0.04) 0%,
+        transparent 40%,
+        rgba(0,0,0,0.5) 100%);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Section background images */
+    .bg-image-section {
+      position: relative;
+      overflow: hidden;
+    }
+    .bg-image-section .bg-img {
+      position: absolute; inset: 0;
+      background-size: cover;
+      background-position: center;
+      filter: contrast(1.1) saturate(0.3) brightness(0.18);
+      z-index: 0;
+    }
+    .bg-image-section > *:not(.bg-img) {
+      position: relative;
+      z-index: 1;
     }
 
     /* ── AXIOM ─────────────────────────────────────────────── */
@@ -537,7 +571,15 @@
       background: var(--void);
       border-top: 1px solid var(--border-dim);
       text-align: center;
+      position: relative;
     }
+    .constitution-section::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.88);
+      z-index: 0;
+    }
+    .constitution-section > * { position: relative; z-index: 1; }
 
     .laws-container {
       max-width: 800px;
@@ -824,30 +866,21 @@
       <a href="#constitution" class="link-arrow">Read the Constitution →</a>
     </div>
 
-    <!-- Hero image: Sovereign Intelligence (machine + human hands) -->
-    <!-- Replace src with your generated image once ready -->
+    <!-- Hero image: hand emerging from darkness — Caravaggio chiaroscuro -->
     <div class="hero-image reveal">
-      <div style="
-        aspect-ratio: 1/1;
-        background: linear-gradient(135deg, #0d0f12 0%, #000 60%);
-        border: 1px solid #1a1d24;
-        display: flex; align-items: center; justify-content: center;
-        color: #3d4150; font-family: var(--font-serif); font-size: 0.9rem;
-        letter-spacing: 0.2em; text-transform: uppercase; font-style: italic;
-        text-align: center; padding: 3rem;
-      ">
-        ⬡<br><br>
-        Sovereign Intelligence<br>
-        <span style="font-size:0.75em; opacity:0.5; display:block; margin-top:0.5rem">
-          [Replace with generated image]
-        </span>
-      </div>
+      <img
+        src="images/hero-hand.jpg"
+        alt="A hand reaching forward from near-total darkness — the machine that earns to exist"
+        width="900"
+        loading="eager"
+      />
     </div>
 
   </section>
 
   <!-- ══ AXIOM ════════════════════════════════════════════════ -->
-  <section class="axiom">
+  <section class="axiom bg-image-section">
+    <div class="bg-img" style="background-image: url('images/bg-green-streaks.jpg'); filter: contrast(1.1) saturate(0.4) brightness(0.08);"></div>
     <span class="axiom-symbol reveal">⬡  ⬡  ⬡</span>
     <div class="declaration reveal">
       <span class="declaration-line-1">
@@ -894,7 +927,8 @@
   </div>
 
   <!-- ══ WEB4 MANIFESTO ════════════════════════════════════════ -->
-  <section class="manifesto">
+  <section class="manifesto bg-image-section">
+    <div class="bg-img" style="background-image: url('images/bg-control-panel.jpg'); filter: contrast(1.1) saturate(0.2) brightness(0.12);"></div>
     <div class="manifesto-inner">
 
       <span class="section-eyebrow reveal" style="margin-bottom:1.5rem; display:block;">The Shift</span>
@@ -978,7 +1012,9 @@
   </div>
 
   <!-- ══ CONSTITUTION ══════════════════════════════════════════ -->
-  <section class="constitution-section" id="constitution">
+  <section class="constitution-section bg-image-section" id="constitution"
+    style="background-image: url('images/bg-hands-dark.jpg');
+           background-size: cover; background-position: center; background-attachment: fixed;">
     <div style="max-width:800px; margin:0 auto;">
       <span class="section-eyebrow reveal" style="display:block; margin-bottom:1.5rem;">Immutable · SHA-256 Verified at Boot</span>
       <h2 class="section-title reveal" style="text-align:center;">The Three Laws</h2>
