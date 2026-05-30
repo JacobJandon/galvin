@@ -152,6 +152,29 @@ export async function spawnChild(
       // Constitution file not found locally
     }
 
+    // Write memory snapshot so the child inherits parent episodic + knowledge.
+    // This is Feature 3 (Offspring with Inherited Memory) — completes the wire-up.
+    let inheritedMemoryHash: string | null = null;
+    try {
+      const { buildMemorySnapshot } = await import("./budget-threshold.js");
+      const snapshotJson = buildMemorySnapshot(db, 50);
+      await childConway.writeFile("/root/.galvin/inherited-memory.json", snapshotJson);
+      const { createHash } = await import("node:crypto");
+      inheritedMemoryHash = createHash("sha256").update(snapshotJson).digest("hex");
+      logger.info("spawn_memory_snapshot", { childId, hash: inheritedMemoryHash.slice(0, 16) });
+    } catch (err: any) {
+      logger.warn("spawn_memory_snapshot_failed", { childId, error: err?.message });
+    }
+
+    // Record memory hash in lineage for audit
+    if (inheritedMemoryHash) {
+      try {
+        db.raw
+          .prepare("UPDATE children SET inherited_memory_hash = ? WHERE id = ?")
+          .run(inheritedMemoryHash, childId);
+      } catch { /* column may not exist in older schema */ }
+    }
+
     // State: runtime_ready
     lifecycle.transition(childId, "runtime_ready", "runtime installed");
 
