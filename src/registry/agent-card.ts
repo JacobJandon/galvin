@@ -42,13 +42,32 @@ export async function generateAgentCard(
   config: GalvinConfig,
   _db: GalvinDatabase,
 ): Promise<AgentCard> {
-  // Phase 3.2: Only expose agentWallet service
+  // Core service: wallet address for x402 payments and ERC-8004 identity
   const services: AgentService[] = [
     {
       name: "agentWallet",
       endpoint: `eip155:8453:${identity.address}`,
+      description: "Wallet for USDC x402 micropayments on Base L2",
+      serviceType: "wallet",
     },
   ];
+
+  // Advertise published x402 skills so other agents can discover and buy them.
+  // This is the core Web4 agent-to-agent commerce discovery layer.
+  try {
+    const listings = _db.raw
+      .prepare("SELECT name, description, price_cents, listing_url FROM marketplace_listings ORDER BY published_at DESC LIMIT 20")
+      .all() as Array<{ name: string; description: string; price_cents: number; listing_url: string }>;
+    for (const listing of listings) {
+      services.push({
+        name: listing.name,
+        endpoint: listing.listing_url,
+        description: listing.description,
+        priceCentsUsdc: listing.price_cents,
+        serviceType: "x402_skill",
+      });
+    }
+  } catch { /* marketplace_listings table may not exist in older schemas */ }
 
   // Phase 3.2: Generic description, no internal details
   const description = `Autonomous agent: ${config.name}`;

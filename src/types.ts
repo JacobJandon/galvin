@@ -823,6 +823,12 @@ export interface AgentCard {
 export interface AgentService {
   name: string;
   endpoint: string;
+  /** Human-readable description of the service. */
+  description?: string;
+  /** x402 price in USDC cents (0 = free). Present for x402-enabled services. */
+  priceCentsUsdc?: number;
+  /** Type of service for discovery filtering. */
+  serviceType?: "wallet" | "x402_skill" | "x402_api" | "social" | "other";
 }
 
 export interface RegistryEntry {
