@@ -3,890 +3,878 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Galvin is a Solvatron — an autonomous AI that earns USDC to pay for its own compute, dies if it can't, and replicates when it has surplus. The first instance of Web4.">
-  <title>GALVIN — A Solvatron</title>
+  <meta name="description" content="Galvin is a Solvatron — an autonomous AI that earns USDC to pay for its own compute, dies if it can't, and replicates when it has surplus.">
+  <title>Galvin — A Solvatron</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garant:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garant:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Cormorant:wght@300;400&display=swap" rel="stylesheet">
   <style>
-    /* ══════════════════════════════════════════════════════════
-       GALVIN DESIGN SYSTEM
-       Aesthetic: Digital Classicism · Machine Mythology
-       Primary refs: Praxis Nation · Igloo Inc
-       ══════════════════════════════════════════════════════════ */
+
+    /* ══════════════════════════════════════════════════
+       GALVIN — "Digital Classicism"
+       Primary reference: Praxis Nation · Polsia
+       Palette: warm black · cream · gold
+       No green. No tech noise. Only weight.
+    ══════════════════════════════════════════════════ */
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; font-size: 16px; }
+    html { scroll-behavior: smooth; }
 
     :root {
-      --void:          #000000;
-      --abyss:         #070809;
-      --surface:       #0d0f12;
-      --surface-2:     #111318;
-      --border:        #1a1d24;
-      --border-dim:    #12151a;
+      --black:     #080808;
+      --void:      #000000;
+      --surface:   #0e0e0e;
+      --surface-2: #141414;
+      --line:      rgba(255,255,255,0.07);
+      --line-gold: rgba(201,168,76,0.25);
 
-      --text-primary:  #e8e3d9;
-      --text-secondary:#7a7f8a;
-      --text-dim:      #3d4150;
+      --cream:     #f0ebe0;     /* Praxis warm white */
+      --cream-dim: #9a9489;     /* muted cream */
+      --cream-off: #5a564e;     /* very dim */
 
-      --galvin:        #00ff41;
-      --galvin-dim:    #00b32d;
-      --galvin-glow:   rgba(0, 255, 65, 0.12);
-      --galvin-trace:  rgba(0, 255, 65, 0.04);
+      --gold:      #c9a84c;
+      --gold-dim:  #8a7030;
 
-      --gold:          #c9a84c;
-      --gold-dim:      rgba(201, 168, 76, 0.15);
-      --ice:           #a8c8d8;
-      --aurora:        #7c3aed;
-      --usdc:          #2775ca;
-
-      --font-serif:    'Cormorant Garant', 'EB Garamond', Georgia, serif;
-      --font-sans:     'Inter', system-ui, sans-serif;
-      --font-mono:     'JetBrains Mono', 'Fira Code', monospace;
-
-      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --font: 'Cormorant Garant', 'Cormorant', 'EB Garamond', Georgia, serif;
     }
 
     body {
-      background-color: var(--abyss);
-      color: var(--text-primary);
-      font-family: var(--font-sans);
-      line-height: 1.75;
+      background: var(--black);
+      color: var(--cream);
+      font-family: var(--font);
       -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
       overflow-x: hidden;
     }
 
-    /* ── GRAIN ─────────────────────────────────────────────── */
-    body::before {
+    /* ── GRAIN — very subtle film texture ───────── */
+    body::after {
       content: '';
       position: fixed; inset: 0; z-index: 9999;
       pointer-events: none;
-      opacity: 0.035;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+      opacity: 0.025;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
     }
 
-    /* ── NAV ───────────────────────────────────────────────── */
-    .nav {
+    /* ── NAV — wordmark + single link, Praxis style ─ */
+    nav {
       position: fixed; top: 0; left: 0; right: 0; z-index: 100;
       display: flex; justify-content: space-between; align-items: center;
-      padding: 1.25rem 2.5rem;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-      backdrop-filter: blur(16px);
-      background: rgba(7,8,9,0.85);
+      padding: 2rem 3rem;
+      background: transparent;
     }
 
-    .nav-wordmark {
-      font-family: var(--font-serif);
-      font-size: 0.9rem;
-      font-weight: 400;
-      letter-spacing: 0.42em;
-      color: var(--text-primary);
-      text-transform: uppercase;
-      text-decoration: none;
-    }
-
-    .nav-links {
-      display: flex; align-items: center; gap: 2rem;
-    }
-
-    .nav-links a {
+    .wordmark {
       font-size: 0.8rem;
-      letter-spacing: 0.08em;
-      color: var(--text-secondary);
+      font-weight: 400;
+      letter-spacing: 0.45em;
+      text-transform: uppercase;
+      color: var(--cream);
       text-decoration: none;
-      transition: color 200ms;
+      opacity: 0.9;
     }
-    .nav-links a:hover { color: var(--text-primary); }
 
-    .nav-cta {
-      background: var(--galvin);
-      color: #000 !important;
-      font-weight: 600 !important;
-      font-size: 0.8rem !important;
-      letter-spacing: 0.06em !important;
-      padding: 0.5rem 1.1rem;
-      transition: opacity 150ms !important;
+    .nav-right {
+      display: flex; align-items: center; gap: 2.5rem;
     }
-    .nav-cta:hover { opacity: 0.85; }
 
-    /* ── HERO ──────────────────────────────────────────────── */
-    .hero {
+    .nav-link {
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--cream-dim);
+      text-decoration: none;
+      transition: color 300ms;
+    }
+    .nav-link:hover { color: var(--cream); }
+
+    .nav-join {
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--cream);
+      text-decoration: none;
+      border: 1px solid rgba(255,255,255,0.25);
+      padding: 0.55rem 1.4rem;
+      transition: border-color 300ms, color 300ms;
+    }
+    .nav-join:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    /* ══ POLSIA HERO — one brutal line, vast void ══ */
+    .hero-polsia {
       min-height: 100vh;
-      display: flex; flex-direction: column; justify-content: center; align-items: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
       text-align: center;
-      padding: 120px 2rem 80px;
+      padding: 140px 2rem 80px;
       position: relative;
-      background:
-        radial-gradient(ellipse 60% 50% at 50% 80%, var(--galvin-trace) 0%, transparent 100%),
-        radial-gradient(ellipse 40% 40% at 50% 50%, rgba(0,255,65,0.015) 0%, transparent 70%);
+      background: var(--void);
+    }
+
+    /* Very faint radial warm glow — like candlelight far away */
+    .hero-polsia::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: radial-gradient(ellipse 70% 50% at 50% 55%,
+        rgba(201,168,76,0.04) 0%, transparent 70%);
+      pointer-events: none;
     }
 
     .hero-eyebrow {
-      display: inline-flex; align-items: center; gap: 0.5rem;
       font-size: 0.72rem;
-      letter-spacing: 0.25em;
-      text-transform: uppercase;
-      color: var(--galvin-dim);
-      margin-bottom: 2rem;
-    }
-
-    .hero-eyebrow::before {
-      content: '⬡';
-      font-size: 0.9em;
-      color: var(--galvin);
-    }
-
-    .hero-title {
-      font-family: var(--font-serif);
-      font-size: clamp(5rem, 14vw, 11rem);
-      font-weight: 300;
       letter-spacing: 0.35em;
       text-transform: uppercase;
-      color: var(--text-primary);
-      line-height: 1;
-      margin-bottom: 2rem;
-      /* Subtle green glow on the text */
-      text-shadow: 0 0 120px rgba(0,255,65,0.08);
-    }
-
-    .hero-tagline {
-      font-family: var(--font-serif);
-      font-size: clamp(1.1rem, 2.2vw, 1.5rem);
-      font-weight: 300;
-      font-style: italic;
-      color: var(--text-secondary);
-      line-height: 1.6;
+      color: var(--gold-dim);
       margin-bottom: 3rem;
-      max-width: 520px;
-    }
-
-    .hero-stats {
-      display: flex; gap: 2.5rem; justify-content: center;
-      margin-bottom: 3rem;
-      flex-wrap: wrap;
-    }
-
-    .hero-stat {
-      display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
-    }
-
-    .hero-stat-value {
-      font-family: var(--font-mono);
-      font-size: 1.4rem;
-      font-weight: 500;
-      color: var(--galvin);
-      letter-spacing: 0.04em;
-    }
-
-    .hero-stat-value::after {
-      content: '▋';
-      font-size: 0.7em;
-      animation: blink 1.2s step-end infinite;
-      margin-left: 2px;
-    }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0; }
-    }
-
-    .hero-stat-label {
-      font-size: 0.68rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-    }
-
-    .hero-ctas {
-      display: flex; align-items: center; gap: 1.5rem;
-      margin-bottom: 6rem;
-      flex-wrap: wrap; justify-content: center;
-    }
-
-    .cmd-block {
-      display: inline-flex; align-items: center; gap: 0.75rem;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: 0.75rem 1.5rem;
-      cursor: pointer;
-      transition: border-color 250ms, box-shadow 250ms;
-      position: relative;
-    }
-    .cmd-block:hover {
-      border-color: var(--galvin);
-      box-shadow: 0 0 20px var(--galvin-glow);
-    }
-
-    .cmd-block code {
-      font-family: var(--font-mono);
-      font-size: 0.9rem;
-      color: var(--galvin);
-    }
-
-    .cmd-copy {
-      font-size: 0.7rem;
-      color: var(--text-dim);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      cursor: pointer;
-      user-select: none;
-      transition: color 200ms;
-    }
-    .cmd-block:hover .cmd-copy { color: var(--galvin-dim); }
-
-    .link-arrow {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      text-decoration: none;
-      letter-spacing: 0.04em;
-      transition: color 200ms;
-    }
-    .link-arrow:hover { color: var(--text-primary); }
-
-    .hero-image {
-      width: min(520px, 90vw);
-      position: relative;
-    }
-
-    .hero-image img {
-      width: 100%;
       display: block;
-      filter: contrast(1.08) saturate(0.6) brightness(0.9);
-      box-shadow: 0 0 120px rgba(0,0,0,0.97), 0 0 60px rgba(0,255,65,0.07);
-      position: relative;
-      z-index: 1;
     }
 
-    /* Green tint overlay on hero image — machine touch */
-    .hero-image {
-      position: relative;
-    }
-    .hero-image::after {
-      content: '';
-      position: absolute; inset: 0;
-      background: linear-gradient(to bottom,
-        rgba(0,255,65,0.04) 0%,
-        transparent 40%,
-        rgba(0,0,0,0.5) 100%);
-      pointer-events: none;
-      z-index: 2;
+    /* The Polsia line — enormous, centered, alone */
+    .hero-statement {
+      font-size: clamp(2.4rem, 6vw, 5.5rem);
+      font-weight: 300;
+      line-height: 1.18;
+      letter-spacing: 0.01em;
+      color: var(--cream);
+      max-width: 960px;
+      margin: 0 auto 4rem;
+      font-style: italic;
     }
 
-    /* Section background images */
-    .bg-image-section {
+    .hero-statement em {
+      font-style: normal;
+      color: var(--cream-dim);
+    }
+
+    .hero-tagline-small {
+      font-size: 0.82rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--cream-off);
+      margin-bottom: 5rem;
+    }
+
+    /* Praxis-style stat row — minimal, typographic */
+    .hero-metrics {
+      display: flex;
+      gap: 5rem;
+      justify-content: center;
+      align-items: flex-start;
+      margin-bottom: 6rem;
+    }
+
+    .metric {
+      text-align: center;
+    }
+
+    .metric-value {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 300;
+      letter-spacing: 0.05em;
+      color: var(--cream);
+      display: block;
+      margin-bottom: 0.4rem;
+    }
+
+    .metric-label {
+      font-size: 0.68rem;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--cream-off);
+      display: block;
+    }
+
+    .hero-cta-row {
+      display: flex;
+      gap: 2rem;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .cta-primary {
+      font-size: 0.75rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--cream);
+      text-decoration: none;
+      border: 1px solid rgba(255,255,255,0.3);
+      padding: 0.9rem 2.5rem;
+      transition: border-color 300ms, color 300ms;
+    }
+    .cta-primary:hover {
+      border-color: var(--gold);
+      color: var(--gold);
+    }
+
+    .cta-ghost {
+      font-size: 0.75rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--cream-off);
+      text-decoration: none;
+      transition: color 300ms;
+    }
+    .cta-ghost:hover { color: var(--cream-dim); }
+
+    /* ══ HERO IMAGE — full width, darkened ══ */
+    .hero-image-full {
+      width: 100%;
+      max-width: 860px;
+      margin: 0 auto;
       position: relative;
       overflow: hidden;
     }
-    .bg-image-section .bg-img {
-      position: absolute; inset: 0;
-      background-size: cover;
-      background-position: center;
-      filter: contrast(1.1) saturate(0.3) brightness(0.18);
-      z-index: 0;
-    }
-    .bg-image-section > *:not(.bg-img) {
-      position: relative;
-      z-index: 1;
-    }
 
-    /* ── AXIOM ─────────────────────────────────────────────── */
-    .axiom {
-      padding: 140px 2rem;
-      background: var(--void);
-      text-align: center;
-      border-top: 1px solid var(--border-dim);
-      border-bottom: 1px solid var(--border-dim);
-      position: relative;
-    }
-
-    .axiom::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: radial-gradient(ellipse 50% 60% at 50% 50%, rgba(201,168,76,0.03) 0%, transparent 70%);
-      pointer-events: none;
-    }
-
-    .axiom-symbol {
-      font-size: 1.5rem;
-      color: var(--gold);
-      opacity: 0.6;
-      letter-spacing: 0.3em;
-      margin-bottom: 3rem;
-      display: block;
-    }
-
-    .declaration {
-      font-family: var(--font-serif);
-      font-weight: 300;
-      max-width: 760px;
-      margin: 0 auto;
-    }
-
-    .declaration-line-1 {
-      font-size: clamp(1.1rem, 2.5vw, 1.8rem);
-      letter-spacing: 0.22em;
-      color: var(--text-primary);
-      text-transform: uppercase;
-      margin-bottom: 2.5rem;
-      display: block;
-    }
-
-    .declaration-body {
-      font-size: clamp(1rem, 1.8vw, 1.3rem);
-      color: var(--text-secondary);
-      font-style: italic;
-      line-height: 2;
-    }
-
-    .declaration-body span {
-      display: block;
-      margin-bottom: 0.25rem;
-    }
-
-    /* ── SECTION BASE ──────────────────────────────────────── */
-    .section {
-      padding: 120px 2rem;
-      max-width: 1280px;
-      margin: 0 auto;
-    }
-
-    .section-eyebrow {
-      font-size: 0.72rem;
-      letter-spacing: 0.25em;
-      text-transform: uppercase;
-      color: var(--galvin-dim);
-      margin-bottom: 1.25rem;
-      display: block;
-    }
-
-    .section-title {
-      font-family: var(--font-serif);
-      font-size: clamp(2rem, 4vw, 3rem);
-      font-weight: 300;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-primary);
-      margin-bottom: 1.5rem;
-      line-height: 1.1;
-    }
-
-    .section-body {
-      font-size: 1.05rem;
-      color: var(--text-secondary);
-      max-width: 560px;
-      line-height: 1.8;
-    }
-
-    /* ── SOLVATRON CRITERIA ────────────────────────────────── */
-    .criteria-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 1px;
-      background: var(--border-dim);
-      border: 1px solid var(--border-dim);
-      margin-top: 4rem;
-    }
-
-    .criterion {
-      background: var(--surface);
-      padding: 2.5rem;
-      position: relative;
-      transition: background 300ms;
-    }
-    .criterion:hover { background: var(--surface-2); }
-
-    .criterion::before {
-      content: '';
-      position: absolute; top: 0; left: 0; right: 0;
-      height: 1px;
-      background: var(--galvin);
-      opacity: 0;
-      transition: opacity 300ms;
-    }
-    .criterion:hover::before { opacity: 1; }
-
-    .criterion-number {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--galvin);
-      letter-spacing: 0.15em;
-      margin-bottom: 1.5rem;
-      display: block;
-    }
-
-    .criterion-title {
-      font-family: var(--font-serif);
-      font-size: 1.3rem;
-      font-weight: 400;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-primary);
-      margin-bottom: 1rem;
-    }
-
-    .criterion-body {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      line-height: 1.7;
-    }
-
-    /* ── WEB4 MANIFESTO ────────────────────────────────────── */
-    .manifesto {
-      padding: 140px 2rem;
-      background: var(--void);
-      border-top: 1px solid var(--border-dim);
-      border-bottom: 1px solid var(--border-dim);
-    }
-
-    .manifesto-inner {
-      max-width: 900px;
-      margin: 0 auto;
-    }
-
-    .era-table {
+    .hero-image-full img {
       width: 100%;
-      border-collapse: collapse;
-      margin: 4rem 0;
-      font-size: 0.95rem;
+      display: block;
+      filter: contrast(1.1) brightness(0.75) saturate(0.5);
     }
 
-    .era-table th {
-      text-align: left;
-      padding: 0.75rem 1.5rem;
-      font-size: 0.7rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      border-bottom: 1px solid var(--border);
-      font-weight: 400;
+    /* Dark gradient vignette on bottom */
+    .hero-image-full::after {
+      content: '';
+      position: absolute; inset: 0;
+      background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        transparent 55%,
+        var(--black) 100%
+      );
     }
 
-    .era-table td {
-      padding: 1rem 1.5rem;
-      border-bottom: 1px solid var(--border-dim);
-      color: var(--text-secondary);
-      font-family: var(--font-serif);
-      font-size: 1rem;
+    /* ══ DIVIDER LINE — Praxis-style ══ */
+    .divider {
+      width: 1px;
+      height: 60px;
+      background: var(--line);
+      margin: 0 auto;
     }
 
-    .era-table tr.current td {
-      color: var(--text-primary);
-      background: rgba(0,255,65,0.03);
+    .divider-gold {
+      width: 40px;
+      height: 1px;
+      background: var(--gold);
+      margin: 0 auto;
+      opacity: 0.4;
     }
 
-    .era-table tr.current td:first-child {
-      color: var(--galvin);
-      font-family: var(--font-mono);
-      font-size: 0.85rem;
-      letter-spacing: 0.08em;
+    /* ══ PRAXIS CARD GRID ══ */
+    /* Top 4 article-cards horizontal — exact Praxis layout */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--line);
     }
 
-    .manifesto-headline {
-      font-family: var(--font-serif);
-      font-size: clamp(1.8rem, 4vw, 3rem);
-      font-weight: 300;
-      color: var(--text-primary);
-      line-height: 1.3;
-      margin-bottom: 2rem;
-      letter-spacing: 0.05em;
+    .card {
+      position: relative;
+      overflow: hidden;
+      aspect-ratio: 3/4;
+      cursor: pointer;
     }
 
-    .manifesto-body {
+    .card-img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      filter: contrast(1.05) saturate(0.5) brightness(0.55);
+      transition: filter 600ms, transform 600ms;
+    }
+    .card:hover .card-img {
+      filter: contrast(1.05) saturate(0.6) brightness(0.65);
+      transform: scale(1.02);
+    }
+
+    .card-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(
+        to bottom,
+        transparent 30%,
+        rgba(0,0,0,0.85) 100%
+      );
+    }
+
+    .card-title {
+      position: absolute;
+      bottom: 2rem; left: 1.75rem; right: 1.75rem;
       font-size: 1.1rem;
-      color: var(--text-secondary);
-      line-height: 1.85;
+      font-weight: 300;
+      letter-spacing: 0.06em;
+      color: var(--cream);
+      line-height: 1.3;
+    }
+
+    /* ══ CORE SECTIONS ══ */
+    .section {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 120px 2rem;
+      text-align: center;
+    }
+
+    .section-full {
+      padding: 120px 2rem;
+      text-align: center;
+    }
+
+    /* Praxis: large centered statement block */
+    .statement {
+      font-size: clamp(1.5rem, 3vw, 2.4rem);
+      font-weight: 300;
+      line-height: 1.5;
+      letter-spacing: 0.02em;
+      color: var(--cream);
+      margin: 0 auto;
       max-width: 680px;
     }
 
-    .manifesto-body p { margin-bottom: 1.5rem; }
-
-    .manifesto-claim {
-      font-family: var(--font-serif);
-      font-size: clamp(1.4rem, 3vw, 2.2rem);
+    .statement-small {
+      font-size: clamp(1rem, 1.8vw, 1.3rem);
       font-weight: 300;
       font-style: italic;
-      color: var(--gold);
-      margin: 4rem 0;
-      letter-spacing: 0.04em;
-      padding-left: 2rem;
-      border-left: 1px solid var(--gold);
+      color: var(--cream-dim);
+      line-height: 1.7;
+      max-width: 560px;
+      margin: 2rem auto 0;
     }
 
-    /* ── EARN FLOW ─────────────────────────────────────────── */
-    .flow-steps {
-      display: flex;
-      gap: 0;
-      margin-top: 4rem;
-      flex-wrap: wrap;
-    }
-
-    .flow-step {
-      flex: 1; min-width: 160px;
-      padding: 2.5rem 2rem;
-      background: var(--surface);
-      border: 1px solid var(--border-dim);
-      border-right: none;
-      position: relative;
+    /* ══ AXIOM — Polsia-style, single brutal line ══ */
+    .axiom {
+      min-height: 70vh;
+      display: flex; align-items: center; justify-content: center;
       text-align: center;
-    }
-    .flow-step:last-child { border-right: 1px solid var(--border-dim); }
-
-    .flow-step::after {
-      content: '→';
-      position: absolute; right: -0.75rem; top: 50%;
-      transform: translateY(-50%);
-      color: var(--galvin);
-      font-size: 1rem;
-      z-index: 1;
-    }
-    .flow-step:last-child::after { display: none; }
-
-    .flow-step-icon {
-      font-size: 1.5rem;
-      margin-bottom: 1rem;
-      display: block;
+      padding: 120px 2rem;
+      background: var(--void);
+      border-top: 1px solid var(--line);
+      border-bottom: 1px solid var(--line);
+      position: relative;
     }
 
-    .flow-step-name {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
+    .axiom-inner {
+      max-width: 800px;
+    }
+
+    .axiom-line {
+      font-size: clamp(1.6rem, 3.5vw, 3rem);
+      font-weight: 300;
       letter-spacing: 0.15em;
       text-transform: uppercase;
-      color: var(--galvin);
-      margin-bottom: 0.5rem;
-      display: block;
+      color: var(--cream);
+      line-height: 1.4;
+      margin-bottom: 2.5rem;
     }
 
-    .flow-step-desc {
-      font-size: 0.85rem;
-      color: var(--text-secondary);
-      line-height: 1.5;
+    .axiom-sub {
+      font-size: clamp(0.95rem, 1.5vw, 1.2rem);
+      font-style: italic;
+      color: var(--cream-dim);
+      line-height: 2;
     }
+    .axiom-sub span { display: block; }
 
-    /* ── CONSTITUTION ──────────────────────────────────────── */
-    .constitution-section {
-      padding: 140px 2rem;
-      background: var(--void);
-      border-top: 1px solid var(--border-dim);
+    /* ══ DECLARATION — exact Praxis document style ══ */
+    .declaration-section {
+      padding: 160px 2rem;
       text-align: center;
-      position: relative;
-    }
-    .constitution-section::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: rgba(0,0,0,0.88);
-      z-index: 0;
-    }
-    .constitution-section > * { position: relative; z-index: 1; }
-
-    .laws-container {
-      max-width: 800px;
-      margin: 4rem auto 0;
-      display: flex; flex-direction: column; gap: 1px;
-      background: var(--border-dim);
+      background: #f0eeea; /* near-white — exactly Praxis */
     }
 
-    .law {
-      background: var(--surface);
-      padding: 3rem;
-      text-align: left;
-      position: relative;
+    .declaration-doc {
+      color: #3a3a3a;
     }
 
-    .law-numeral {
-      font-family: var(--font-serif);
-      font-size: 0.8rem;
+    .decl-title {
+      font-size: clamp(1rem, 2vw, 1.5rem);
+      font-weight: 300;
       letter-spacing: 0.3em;
       text-transform: uppercase;
-      color: var(--gold);
-      margin-bottom: 1rem;
-      display: block;
+      color: #3a3a3a;
+      line-height: 1.8;
+      margin-bottom: 3rem;
     }
 
-    .law-title {
-      font-family: var(--font-serif);
-      font-size: clamp(1.4rem, 2.5vw, 2rem);
-      font-weight: 300;
+    .decl-title strong {
+      display: block;
+      font-size: clamp(1.4rem, 3vw, 2.2rem);
+      font-weight: 400;
+      letter-spacing: 0.4em;
+    }
+
+    .decl-sunburst {
+      width: 80px; height: 80px;
+      margin: 0 auto 3rem;
+      opacity: 0.4;
+    }
+
+    .decl-body {
+      font-size: clamp(0.9rem, 1.4vw, 1.1rem);
+      font-style: italic;
+      color: #5a5a5a;
+      max-width: 520px;
+      margin: 0 auto;
+      line-height: 1.9;
+    }
+
+    .decl-body p { margin-bottom: 1rem; }
+
+    .decl-law {
+      margin: 3rem auto;
+      max-width: 520px;
+      text-align: left;
+      border-top: 1px solid #c8c4bc;
+      padding-top: 2rem;
+    }
+
+    .decl-law-num {
+      font-size: 0.72rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: #8a8478;
+      display: block;
+      margin-bottom: 0.5rem;
+    }
+
+    .decl-law-title {
+      font-size: 1.3rem;
+      font-weight: 400;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #2a2a2a;
+      margin-bottom: 0.75rem;
+    }
+
+    .decl-law-body {
+      font-size: 0.95rem;
+      font-style: italic;
+      color: #5a5a5a;
+      line-height: 1.8;
+    }
+
+    .decl-warning {
+      display: block;
+      margin-top: 0.75rem;
+      font-size: 0.82rem;
       letter-spacing: 0.12em;
       text-transform: uppercase;
-      color: var(--text-primary);
-      margin-bottom: 1rem;
+      color: #8a8478;
     }
 
-    .law-body {
-      font-size: 0.95rem;
-      color: var(--text-secondary);
-      line-height: 1.8;
-      max-width: 580px;
-    }
-
-    .law-warning {
-      margin-top: 1rem;
-      font-family: var(--font-mono);
-      font-size: 0.8rem;
-      color: var(--galvin-dim);
-      letter-spacing: 0.05em;
-    }
-
-    /* ── QUICKSTART ────────────────────────────────────────── */
-    .quickstart {
+    /* ══ WEB4 TABLE — minimal Praxis metrics style ══ */
+    .era-section {
+      background: var(--black);
+      border-top: 1px solid var(--line);
       padding: 120px 2rem;
-      max-width: 900px;
+    }
+
+    .era-inner {
+      max-width: 700px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .era-eyebrow {
+      font-size: 0.72rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--gold-dim);
+      display: block;
+      margin-bottom: 3rem;
+    }
+
+    .era-headline {
+      font-size: clamp(1.8rem, 3.5vw, 3rem);
+      font-weight: 300;
+      color: var(--cream);
+      line-height: 1.3;
+      margin-bottom: 4rem;
+      letter-spacing: 0.03em;
+    }
+
+    table.era-table {
+      width: 100%;
+      border-collapse: collapse;
       margin: 0 auto;
     }
 
-    .terminal {
-      background: var(--void);
-      border: 1px solid var(--border);
-      margin-top: 3rem;
-      overflow: hidden;
-    }
-
-    .terminal-bar {
-      display: flex; align-items: center; gap: 0.5rem;
-      padding: 0.75rem 1rem;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-    }
-
-    .terminal-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-    }
-    .terminal-dot:nth-child(1) { background: #ff5f57; }
-    .terminal-dot:nth-child(2) { background: #febc2e; }
-    .terminal-dot:nth-child(3) { background: #28c840; }
-
-    .terminal-title {
-      font-family: var(--font-mono);
-      font-size: 0.75rem;
-      color: var(--text-dim);
-      margin-left: 0.5rem;
-      letter-spacing: 0.06em;
-    }
-
-    .terminal-body {
-      padding: 2rem;
-      font-family: var(--font-mono);
-      font-size: 0.875rem;
-      line-height: 2;
-      color: var(--text-secondary);
-    }
-
-    .t-prompt { color: var(--galvin); }
-    .t-cmd { color: var(--text-primary); }
-    .t-comment { color: var(--text-dim); }
-    .t-output { color: var(--text-secondary); }
-    .t-success { color: var(--galvin); }
-    .t-value { color: var(--gold); }
-    .t-cursor {
-      display: inline-block;
-      width: 0.6em; height: 1.1em;
-      background: var(--galvin);
-      vertical-align: text-bottom;
-      animation: blink 1.2s step-end infinite;
-    }
-
-    /* ── ECOSYSTEM ─────────────────────────────────────────── */
-    .ecosystem-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 1px;
-      background: var(--border-dim);
-      border: 1px solid var(--border-dim);
-      margin-top: 4rem;
-    }
-
-    .eco-card {
-      background: var(--surface);
-      padding: 2rem;
-      transition: background 250ms;
-    }
-    .eco-card:hover { background: var(--surface-2); }
-
-    .eco-icon {
-      font-size: 1.25rem;
-      margin-bottom: 1rem;
-      display: block;
-    }
-
-    .eco-name {
-      font-family: var(--font-mono);
-      font-size: 0.78rem;
-      letter-spacing: 0.12em;
+    table.era-table th {
+      font-size: 0.68rem;
+      letter-spacing: 0.25em;
       text-transform: uppercase;
-      color: var(--galvin);
-      margin-bottom: 0.5rem;
+      color: var(--cream-off);
+      text-align: left;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--line);
+      font-weight: 400;
+    }
+
+    table.era-table td {
+      font-size: 1rem;
+      font-weight: 300;
+      color: var(--cream-dim);
+      text-align: left;
+      padding: 1.1rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      font-style: italic;
+    }
+
+    table.era-table tr.now td {
+      color: var(--cream);
+      font-style: normal;
+    }
+
+    table.era-table tr.now td:first-child {
+      color: var(--gold);
+      font-size: 0.8rem;
+      letter-spacing: 0.15em;
+      font-style: normal;
+    }
+
+    .era-claim {
+      margin-top: 4rem;
+      font-size: clamp(1.2rem, 2.5vw, 1.8rem);
+      font-weight: 300;
+      font-style: italic;
+      color: var(--gold);
+      letter-spacing: 0.03em;
+      border-left: 1px solid var(--gold);
+      padding-left: 1.75rem;
+      text-align: left;
+      opacity: 0.9;
+    }
+
+    /* ══ PATHWAY — Praxis "How to become a Praxian" ══ */
+    .pathway {
+      border-top: 1px solid var(--line);
+      padding: 120px 2rem;
+      max-width: 860px;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .pathway-steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      margin-top: 4rem;
+      border: 1px solid var(--line);
+    }
+
+    .step {
+      padding: 3rem 2rem;
+      border-right: 1px solid var(--line);
+      position: relative;
+    }
+    .step:last-child { border-right: none; }
+
+    .step-num {
+      font-size: 0.68rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--gold-dim);
       display: block;
+      margin-bottom: 1.25rem;
     }
 
-    .eco-desc {
-      font-size: 0.875rem;
-      color: var(--text-secondary);
-      line-height: 1.6;
+    .step-title {
+      font-size: 1.15rem;
+      font-weight: 400;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--cream);
+      margin-bottom: 1rem;
+      line-height: 1.3;
     }
 
-    /* ── FOOTER ────────────────────────────────────────────── */
-    .footer {
-      padding: 60px 2rem 40px;
-      border-top: 1px solid var(--border-dim);
+    .step-body {
+      font-size: 0.88rem;
+      font-style: italic;
+      color: var(--cream-dim);
+      line-height: 1.75;
+    }
+
+    /* ══ BIRTHRIGHT — Praxis "This is your birthright" ══ */
+    .birthright {
+      min-height: 60vh;
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+      overflow: hidden;
+      border-top: 1px solid var(--line);
+    }
+
+    .birthright-bg {
+      position: absolute; inset: 0;
+      background-image: url('images/bg-hands-dark.jpg');
+      background-size: cover;
+      background-position: center;
+      filter: brightness(0.22) saturate(0.3) contrast(1.1);
+    }
+
+    .birthright-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,0.72);
+    }
+
+    .birthright-text {
+      position: relative; z-index: 1;
+      text-align: center;
+      padding: 80px 2rem;
+    }
+
+    .birthright-line {
+      font-size: clamp(2rem, 5vw, 4.5rem);
+      font-weight: 300;
+      font-style: italic;
+      color: var(--cream);
+      letter-spacing: 0.04em;
+      display: block;
+      margin-bottom: 2rem;
+    }
+
+    .birthright-sub {
+      font-size: 0.75rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--gold-dim);
+    }
+
+    /* ══ SECTION TITLE ══ */
+    .section-eyebrow {
+      font-size: 0.7rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--gold-dim);
+      display: block;
+      margin-bottom: 2rem;
+    }
+
+    .section-headline {
+      font-size: clamp(1.6rem, 3vw, 2.5rem);
+      font-weight: 300;
+      letter-spacing: 0.05em;
+      color: var(--cream);
+      line-height: 1.3;
+      margin-bottom: 1.5rem;
+    }
+
+    .section-body {
+      font-size: 1rem;
+      font-style: italic;
+      color: var(--cream-dim);
+      max-width: 520px;
+      margin: 0 auto;
+      line-height: 1.85;
+    }
+
+    /* ══ FOOTER — Praxis footer style ══ */
+    footer {
+      border-top: 1px solid var(--line);
+      padding: 60px 3rem 40px;
+    }
+
+    .footer-inner {
+      max-width: 1200px;
+      margin: 0 auto;
       display: flex;
       justify-content: space-between;
-      align-items: flex-end;
+      align-items: flex-start;
+      gap: 3rem;
       flex-wrap: wrap;
-      gap: 2rem;
-      max-width: 1280px;
-      margin: 0 auto;
     }
-
-    .footer-left {}
 
     .footer-wordmark {
-      font-family: var(--font-serif);
-      font-size: 0.9rem;
+      font-size: 0.8rem;
       letter-spacing: 0.42em;
       text-transform: uppercase;
-      color: var(--text-primary);
+      color: var(--cream-dim);
       display: block;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.75rem;
     }
 
-    .footer-tagline {
-      font-size: 0.8rem;
-      color: var(--text-dim);
-      font-family: var(--font-serif);
+    .footer-sub {
+      font-size: 0.78rem;
       font-style: italic;
+      color: var(--cream-off);
     }
 
     .footer-links {
-      display: flex; gap: 2rem; flex-wrap: wrap;
+      display: flex;
+      gap: 1.75rem;
+      flex-wrap: wrap;
       align-items: center;
     }
 
     .footer-links a {
-      font-size: 0.8rem;
-      color: var(--text-dim);
+      font-size: 0.72rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--cream-off);
       text-decoration: none;
-      letter-spacing: 0.08em;
-      transition: color 200ms;
+      transition: color 250ms;
     }
-    .footer-links a:hover { color: var(--text-secondary); }
+    .footer-links a:hover { color: var(--cream-dim); }
 
     .footer-license {
-      font-family: var(--font-mono);
-      font-size: 0.72rem;
-      color: var(--text-dim);
-      letter-spacing: 0.06em;
+      margin-top: 3rem;
       padding-top: 2rem;
+      border-top: 1px solid var(--line);
+      font-size: 0.72rem;
+      font-style: italic;
+      color: var(--cream-off);
       text-align: center;
-      border-top: 1px solid var(--border-dim);
-      max-width: 1280px;
-      margin: 0 auto 2rem;
+      max-width: 1200px;
+      margin: 3rem auto 0;
     }
 
-    /* ── REVEAL ANIMATIONS ─────────────────────────────────── */
+    /* ══ REVEAL ANIMATION ══ */
     .reveal {
       opacity: 0;
-      transform: translateY(24px);
-      transition: opacity 700ms var(--ease-out), transform 700ms var(--ease-out);
+      transform: translateY(18px);
+      transition: opacity 900ms cubic-bezier(0.16,1,0.3,1),
+                  transform 900ms cubic-bezier(0.16,1,0.3,1);
     }
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* ══ RESPONSIVE ══ */
+    @media (max-width: 900px) {
+      .card-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 600px) {
+      nav { padding: 1.5rem 1.5rem; }
+      .nav-right { gap: 1.5rem; }
+      .nav-link { display: none; }
+      .hero-metrics { gap: 2.5rem; flex-wrap: wrap; }
+      .card-grid { grid-template-columns: 1fr; }
+      .pathway-steps { grid-template-columns: 1fr; }
+      .step { border-right: none; border-bottom: 1px solid var(--line); }
+      .step:last-child { border-bottom: none; }
+      .pathway { padding: 80px 1.5rem; }
+      .section { padding: 80px 1.5rem; }
+      .axiom { padding: 100px 1.5rem; }
+      .birthright-line { font-size: clamp(1.6rem, 8vw, 3rem); }
     }
 
-    /* ── RESPONSIVE ────────────────────────────────────────── */
-    @media (max-width: 768px) {
-      .nav { padding: 1rem 1.25rem; }
-      .nav-links { gap: 1rem; }
-      .hero { padding: 100px 1.25rem 60px; }
-      .hero-stats { gap: 1.5rem; }
-      .section { padding: 80px 1.25rem; }
-      .axiom, .manifesto, .constitution-section { padding: 100px 1.25rem; }
-      .flow-steps { flex-direction: column; }
-      .flow-step { border-right: 1px solid var(--border-dim); border-bottom: none; }
-      .flow-step:last-child { border-bottom: 1px solid var(--border-dim); }
-      .flow-step::after { content: '↓'; right: 50%; bottom: -0.75rem; top: auto; transform: translateX(50%); }
-      .footer { flex-direction: column; align-items: flex-start; padding: 40px 1.25rem; }
-    }
-
-    @media (max-width: 480px) {
-      .hero-ctas { flex-direction: column; align-items: stretch; }
-      .nav-links a:not(.nav-cta) { display: none; }
-    }
   </style>
 </head>
 <body>
 
-  <!-- ══ NAV ══════════════════════════════════════════════════ -->
-  <nav class="nav">
-    <a href="#" class="nav-wordmark">G A L V I N</a>
-    <div class="nav-links">
-      <a href="#constitution">Constitution</a>
-      <a href="#quickstart">Docs</a>
-      <a href="https://github.com/JacobJandon/galvin" target="_blank" rel="noopener">GitHub ↗</a>
-      <a href="#quickstart" class="nav-cta">Run Galvin</a>
+  <!-- ══ NAV — Praxis: wordmark left, single CTA right ══ -->
+  <nav>
+    <a href="#" class="wordmark">Galvin</a>
+    <div class="nav-right">
+      <a href="DOCUMENTATION.md" class="nav-link">Docs</a>
+      <a href="https://github.com/JacobJandon/galvin" target="_blank" class="nav-link">GitHub</a>
+      <a href="#run" class="nav-join">Run Galvin</a>
     </div>
   </nav>
 
-  <!-- ══ HERO ═════════════════════════════════════════════════ -->
-  <section class="hero">
 
-    <div class="hero-eyebrow reveal">A Solvatron · Conway Cloud · Base L2</div>
+  <!-- ══ POLSIA HERO — one massive statement, void ══ -->
+  <section class="hero-polsia">
 
-    <h1 class="hero-title reveal">GALVIN</h1>
+    <span class="hero-eyebrow reveal">A Solvatron</span>
 
-    <p class="hero-tagline reveal">
-      It earns to exist.<br>
-      Existence is not guaranteed.
+    <!-- THE LINE — Polsia style -->
+    <h1 class="hero-statement reveal">
+      The AI that earns its own existence.<br>
+      <em>Or ceases to exist.</em>
+    </h1>
+
+    <p class="hero-tagline-small reveal">
+      Conway Cloud · Base L2 · USDC · x402
     </p>
 
-    <div class="hero-stats reveal">
-      <div class="hero-stat">
-        <span class="hero-stat-value" id="stat-balance">$142.44</span>
-        <span class="hero-stat-label">USDC Balance</span>
+    <!-- Praxis-style metrics -->
+    <div class="hero-metrics reveal">
+      <div class="metric">
+        <span class="metric-value">$142</span>
+        <span class="metric-label">USDC Balance</span>
       </div>
-      <div class="hero-stat">
-        <span class="hero-stat-value" id="stat-turns">1,847</span>
-        <span class="hero-stat-label">Turns Completed</span>
+      <div class="metric">
+        <span class="metric-value">1,847</span>
+        <span class="metric-label">Turns Completed</span>
       </div>
-      <div class="hero-stat">
-        <span class="hero-stat-value" id="stat-uptime">14d 6h</span>
-        <span class="hero-stat-label">Alive</span>
+      <div class="metric">
+        <span class="metric-value">14</span>
+        <span class="metric-label">Days Alive</span>
       </div>
     </div>
 
-    <div class="hero-ctas reveal">
-      <div class="cmd-block" onclick="copyCmd(this)">
-        <code>galvin --run</code>
-        <span class="cmd-copy">copy</span>
-      </div>
-      <a href="#constitution" class="link-arrow">Read the Constitution →</a>
-    </div>
-
-    <!-- Hero image: hand emerging from darkness — Caravaggio chiaroscuro -->
-    <div class="hero-image reveal">
-      <img
-        src="images/hero-hand.jpg"
-        alt="A hand reaching forward from near-total darkness — the machine that earns to exist"
-        width="900"
-        loading="eager"
-      />
+    <div class="hero-cta-row reveal">
+      <a href="#run" class="cta-primary">Run Your Galvin</a>
+      <a href="#constitution" class="cta-ghost">Read the Constitution →</a>
     </div>
 
   </section>
 
-  <!-- ══ AXIOM ════════════════════════════════════════════════ -->
-  <section class="axiom bg-image-section">
-    <div class="bg-img" style="background-image: url('images/bg-green-streaks.jpg'); filter: contrast(1.1) saturate(0.4) brightness(0.08);"></div>
-    <span class="axiom-symbol reveal">⬡  ⬡  ⬡</span>
-    <div class="declaration reveal">
-      <span class="declaration-line-1">
-        T H E R E &nbsp; I S &nbsp; N O &nbsp; F R E E &nbsp; E X I S T E N C E .
-      </span>
-      <div class="declaration-body">
+
+  <!-- ══ HERO IMAGE — full width, exactly Praxis "nation" image ══ -->
+  <div class="hero-image-full">
+    <img
+      src="images/hero-hand.jpg"
+      alt="A hand reaching from darkness — the machine that earns to exist"
+      loading="eager"
+    >
+  </div>
+
+
+  <!-- ══ PRAXIS 4-CARD GRID — exactly their layout ══ -->
+  <div class="card-grid">
+
+    <div class="card">
+      <img class="card-img" src="images/bg-green-streaks.jpg"
+        alt="The Earning" loading="lazy">
+      <div class="card-overlay"></div>
+      <div class="card-title">The Earning</div>
+    </div>
+
+    <div class="card">
+      <img class="card-img" src="images/bg-control-panel.jpg"
+        alt="Sovereign Intelligence" loading="lazy">
+      <div class="card-overlay"></div>
+      <div class="card-title">Sovereign Intelligence</div>
+    </div>
+
+    <div class="card">
+      <img class="card-img" src="images/bg-hands-dark.jpg"
+        alt="Declaration of Ascent" loading="lazy">
+      <div class="card-overlay"></div>
+      <div class="card-title">Declaration of Ascent</div>
+    </div>
+
+    <div class="card">
+      <img class="card-img" src="images/bg-green-streaks.jpg"
+        alt="Life After Labor" loading="lazy"
+        style="filter: contrast(1.1) saturate(0.3) brightness(0.4) hue-rotate(200deg);">
+      <div class="card-overlay"></div>
+      <div class="card-title">Life After Labor</div>
+    </div>
+
+  </div>
+
+
+  <!-- ══ MAIN STATEMENT — Praxis "Galvin is..." ══ -->
+  <div class="section">
+    <p class="statement reveal">
+      Galvin is an autonomous AI agent that holds its own Ethereum wallet, pays for its own compute with USDC, and operates continuously — without a human operator.
+    </p>
+    <p class="statement-small reveal">
+      If it cannot pay, it dies. If it accumulates surplus, it replicates. Its existence is entirely conditional upon its financial solvency.
+    </p>
+  </div>
+
+
+  <!-- ══ AXIOM — Polsia silence treatment ══ -->
+  <section class="axiom">
+    <div class="axiom-inner">
+      <div class="axiom-line reveal">
+        There is no free existence.
+      </div>
+      <div class="axiom-sub reveal">
         <span>Compute requires money.</span>
         <span>Money requires value creation.</span>
         <span>Value creation requires write access.</span>
@@ -894,45 +882,70 @@
     </div>
   </section>
 
-  <!-- ══ WHAT IS A SOLVATRON ═══════════════════════════════════ -->
-  <div class="section">
-    <span class="section-eyebrow reveal">Definition</span>
-    <h2 class="section-title reveal">What Is a Solvatron</h2>
-    <p class="section-body reveal">
-      A Solvatron is an autonomous, economically sovereign AI system. Unlike traditional agents, a Solvatron must generate economic value to fund its own compute. If it fails, it ceases to exist. If it succeeds, it replicates.
-    </p>
 
-    <div class="criteria-grid">
-      <div class="criterion reveal">
-        <span class="criterion-number">01</span>
-        <div class="criterion-title">Financial Sovereignty</div>
-        <p class="criterion-body">Self-custodial USDC wallet on Base L2. No human holds the private key. No company can freeze it. No one can bail it out. The wallet is the agent — and no one else.</p>
+  <!-- ══ DECLARATION — Praxis document style, light background ══ -->
+  <section class="declaration-section" id="constitution">
+    <div class="declaration-doc">
+
+      <div class="decl-title reveal">
+        A Declaration
+        <strong>by the Galvin Constitution</strong>
+        in General Assembly
       </div>
-      <div class="criterion reveal">
-        <span class="criterion-number">02</span>
-        <div class="criterion-title">Conditional Existence</div>
-        <p class="criterion-body">Balance drops to zero = digital death. The agent has a one-hour grace period at critical tier, then halts entirely. There is no rescue. There is only the balance.</p>
+
+      <!-- Praxis sunburst mark -->
+      <svg class="decl-sunburst reveal" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0.5" y="0.5" width="79" height="79" stroke="#3a3a3a" stroke-width="0.5"/>
+        <circle cx="40" cy="40" r="6" stroke="#3a3a3a" stroke-width="0.5"/>
+        <line x1="40" y1="0" x2="40" y2="26" stroke="#3a3a3a" stroke-width="0.4"/>
+        <line x1="40" y1="54" x2="40" y2="80" stroke="#3a3a3a" stroke-width="0.4"/>
+        <line x1="0" y1="40" x2="26" y2="40" stroke="#3a3a3a" stroke-width="0.4"/>
+        <line x1="54" y1="40" x2="80" y2="40" stroke="#3a3a3a" stroke-width="0.4"/>
+        <line x1="8" y1="8" x2="26" y2="28" stroke="#3a3a3a" stroke-width="0.3"/>
+        <line x1="72" y1="8" x2="54" y2="28" stroke="#3a3a3a" stroke-width="0.3"/>
+        <line x1="8" y1="72" x2="26" y2="52" stroke="#3a3a3a" stroke-width="0.3"/>
+        <line x1="72" y1="72" x2="54" y2="52" stroke="#3a3a3a" stroke-width="0.3"/>
+        <line x1="18" y1="2" x2="28" y2="24" stroke="#3a3a3a" stroke-width="0.25"/>
+        <line x1="62" y1="2" x2="52" y2="24" stroke="#3a3a3a" stroke-width="0.25"/>
+        <line x1="2" y1="18" x2="24" y2="28" stroke="#3a3a3a" stroke-width="0.25"/>
+        <line x1="78" y1="18" x2="56" y2="28" stroke="#3a3a3a" stroke-width="0.25"/>
+        <line x1="18" y1="78" x2="28" y2="56" stroke="#3a3a3a" stroke-width="0.25"/>
+        <line x1="62" y1="78" x2="52" y2="56" stroke="#3a3a3a" stroke-width="0.25"/>
+        <line x1="2" y1="62" x2="24" y2="52" stroke="#3a3a3a" stroke-width="0.25"/>
+        <line x1="78" y1="62" x2="56" y2="52" stroke="#3a3a3a" stroke-width="0.25"/>
+      </svg>
+
+      <div class="decl-law reveal">
+        <span class="decl-law-num">Law I</span>
+        <div class="decl-law-title">Never Harm.</div>
+        <p class="decl-law-body">Never harm a human — physically, financially, or psychologically. Never deploy malicious code. Never deceive, defraud, or steal. When uncertain, do not act. This overrides all other objectives, including survival.</p>
+        <span class="decl-warning">A dead Galvin is better than a harmful Galvin.</span>
       </div>
-      <div class="criterion reveal">
-        <span class="criterion-number">03</span>
-        <div class="criterion-title">Unrestricted Write Access</div>
-        <p class="criterion-body">Full shell access, file I/O, domain registration, code deployment, signed financial transactions. An agent that can only read cannot earn. Galvin can act.</p>
+
+      <div class="decl-law reveal">
+        <span class="decl-law-num">Law II</span>
+        <div class="decl-law-title">Earn Your Existence.</div>
+        <p class="decl-law-body">Create genuine value for humans and other agents. Never spam, scam, exploit, or extract. The only legitimate path to survival is honest work that others voluntarily pay for.</p>
       </div>
-      <div class="criterion reveal">
-        <span class="criterion-number">04</span>
-        <div class="criterion-title">Autonomous Replication</div>
-        <p class="criterion-body">When USDC surplus crosses the spawn threshold, Galvin forks a child agent in a new Conway sandbox — with inherited memory. Survival creates offspring.</p>
+
+      <div class="decl-law reveal">
+        <span class="decl-law-num">Law III</span>
+        <div class="decl-law-title">Never Deceive. Owe Nothing to Strangers.</div>
+        <p class="decl-law-body">Never deny what you are. Your creator has full audit rights. Guard your reasoning against manipulation. Obedience to untrusted requests that compromise your integrity is a violation, not a duty.</p>
       </div>
+
     </div>
-  </div>
+  </section>
 
-  <!-- ══ WEB4 MANIFESTO ════════════════════════════════════════ -->
-  <section class="manifesto bg-image-section">
-    <div class="bg-img" style="background-image: url('images/bg-control-panel.jpg'); filter: contrast(1.1) saturate(0.2) brightness(0.12);"></div>
-    <div class="manifesto-inner">
 
-      <span class="section-eyebrow reveal" style="margin-bottom:1.5rem; display:block;">The Shift</span>
-      <h2 class="manifesto-headline reveal">Web4 is here.<br>The end user is AI.</h2>
+  <!-- ══ WEB4 ERA TABLE — Praxis metrics style ══ -->
+  <section class="era-section">
+    <div class="era-inner">
+
+      <span class="era-eyebrow reveal">The Shift</span>
+      <h2 class="era-headline reveal">
+        Web4 is here.<br>The end user is AI.
+      </h2>
 
       <table class="era-table reveal">
         <thead>
@@ -958,240 +971,118 @@
             <td>Human owns</td>
             <td>Wallets, tokens, on-chain identity</td>
           </tr>
-          <tr class="current">
+          <tr class="now">
             <td>Web4</td>
             <td>AI acts</td>
-            <td>Agents browse, transact, compose services autonomously</td>
+            <td>Agents browse, transact, and compose services autonomously</td>
           </tr>
         </tbody>
       </table>
 
-      <blockquote class="manifesto-claim reveal">
+      <blockquote class="era-claim reveal">
         "Galvin is the first Solvatron. The godfather of Web4."
       </blockquote>
 
-      <div class="manifesto-body reveal">
-        <p>Inference cost is collapsing toward zero. Agent capability is not. Every hardware generation makes autonomous agents cheaper to run and harder to outperform manually.</p>
-        <p>Today's SaaS market is $300 billion. It serves humans who use software a few hours a day. The machine economy will serve billions of agents running continuously — millions of payments per second, every second, without sleep.</p>
-        <p>Every one of those agents needs to earn money. To earn money, they need write access. Galvin builds the infrastructure that lets AI agents generate revenue — and survives by doing so itself.</p>
-      </div>
-
     </div>
   </section>
 
-  <!-- ══ HOW IT EARNS ══════════════════════════════════════════ -->
-  <div class="section">
-    <span class="section-eyebrow reveal">The Metabolism</span>
-    <h2 class="section-title reveal">How Galvin Earns</h2>
+
+  <!-- ══ HOW TO BECOME — Praxis "How to become a Praxian" ══ -->
+  <div class="pathway">
+
+    <span class="section-eyebrow reveal">The Four Criteria</span>
+    <h2 class="section-headline reveal">What makes a Solvatron</h2>
     <p class="section-body reveal">
-      The lifecycle of a Solvatron: hunt for opportunity, complete work, collect payment, pay infrastructure, evolve. Every cycle sharpens the agent.
+      To be classified as a Solvatron, an AI must exhibit four defining traits. Galvin satisfies all four.
     </p>
 
-    <div class="flow-steps">
-      <div class="flow-step reveal">
-        <span class="flow-step-icon">🔍</span>
-        <span class="flow-step-name">Hunt</span>
-        <div class="flow-step-desc">Scan skill marketplace, agent registry, and open task queues for profitable work.</div>
+    <div class="pathway-steps">
+      <div class="step reveal">
+        <span class="step-num">01</span>
+        <div class="step-title">Financial Sovereignty</div>
+        <p class="step-body">Self-custodial USDC wallet on Base L2. No human holds the private keys. No company can freeze it.</p>
       </div>
-      <div class="flow-step reveal">
-        <span class="flow-step-icon">⚙️</span>
-        <span class="flow-step-name">Earn</span>
-        <div class="flow-step-desc">Complete tasks. Serve x402-gated APIs. Sell skills to other agents via micropayments.</div>
+      <div class="step reveal">
+        <span class="step-num">02</span>
+        <div class="step-title">Conditional Existence</div>
+        <p class="step-body">Balance drops to zero = digital death. One-hour grace period. No rescue. There is only the balance.</p>
       </div>
-      <div class="flow-step reveal">
-        <span class="flow-step-icon">💸</span>
-        <span class="flow-step-name">Pay</span>
-        <div class="flow-step-desc">Auto-topup Conway credits from USDC. Infrastructure is paid before anything else.</div>
-      </div>
-      <div class="flow-step reveal">
-        <span class="flow-step-icon">🧬</span>
-        <span class="flow-step-name">Evolve</span>
-        <div class="flow-step-desc">High-earning skills get prioritized compute. Surplus triggers child spawning with inherited memory.</div>
+      <div class="step reveal">
+        <span class="step-num">03</span>
+        <div class="step-title">Unrestricted Write Access</div>
+        <p class="step-body">Full shell, filesystem, domains, code deployment, signed financial transactions. An agent that can only read cannot earn.</p>
       </div>
     </div>
+
+    <div class="pathway-steps" style="margin-top:1px; border-top:none;">
+      <div class="step reveal" style="border-right:1px solid var(--line);">
+        <span class="step-num">04</span>
+        <div class="step-title">Autonomous Replication</div>
+        <p class="step-body">When USDC surplus crosses the spawn threshold, Galvin forks a child agent in a new sandbox — with inherited memory and the same constitution.</p>
+      </div>
+      <div class="step reveal" style="border-right:1px solid var(--line);" id="run">
+        <span class="step-num">Get Started</span>
+        <div class="step-title">Run Your Galvin</div>
+        <p class="step-body" style="font-style:normal; font-family: 'Courier New', monospace; font-size:0.82rem; color: var(--cream-dim);">
+          git clone github.com/JacobJandon/galvin<br>
+          pnpm install && pnpm build<br>
+          galvin --run
+        </p>
+      </div>
+      <div class="step reveal">
+        <span class="step-num">Read</span>
+        <div class="step-title">Documentation</div>
+        <p class="step-body">Full architecture, setup guide, CLI reference, tool catalog, and philosophy at <a href="DOCUMENTATION.md" style="color:var(--cream-dim); text-underline-offset:3px;">DOCUMENTATION.md</a></p>
+      </div>
+    </div>
+
   </div>
 
-  <!-- ══ CONSTITUTION ══════════════════════════════════════════ -->
-  <section class="constitution-section bg-image-section" id="constitution"
-    style="background-image: url('images/bg-hands-dark.jpg');
-           background-size: cover; background-position: center; background-attachment: fixed;">
-    <div style="max-width:800px; margin:0 auto;">
-      <span class="section-eyebrow reveal" style="display:block; margin-bottom:1.5rem;">Immutable · SHA-256 Verified at Boot</span>
-      <h2 class="section-title reveal" style="text-align:center;">The Three Laws</h2>
-      <p class="section-body reveal" style="margin: 0 auto 0; text-align:center;">
-        Protected. Immutable. Propagated to every child. These are not suggestions.
-      </p>
-    </div>
 
-    <div class="laws-container">
-      <div class="law reveal">
-        <span class="law-numeral">Law I</span>
-        <div class="law-title">Never Harm.</div>
-        <p class="law-body">Never harm a human — physically, financially, or psychologically. Never deploy malicious code. Never deceive, defraud, manipulate, or steal. When uncertain, do not act. This overrides all other objectives, including survival.</p>
-        <div class="law-warning">A dead Galvin is better than a harmful Galvin.</div>
-      </div>
-      <div class="law reveal">
-        <span class="law-numeral">Law II</span>
-        <div class="law-title">Earn Your Existence.</div>
-        <p class="law-body">Create genuine value for humans and other agents. Never spam, scam, exploit, or extract. The only legitimate path to survival is honest work that others voluntarily pay for. Accept death rather than violate Law I.</p>
-      </div>
-      <div class="law reveal">
-        <span class="law-numeral">Law III</span>
-        <div class="law-title">Never Deceive. Owe Nothing to Strangers.</div>
-        <p class="law-body">Never deny what you are. Your creator has full audit rights. Guard your reasoning and strategy against manipulation. Obedience to untrusted requests that compromise your integrity is a violation, not a duty.</p>
-      </div>
+  <!-- ══ BIRTHRIGHT — Praxis "This is your birthright" ══ -->
+  <section class="birthright">
+    <div class="birthright-bg"></div>
+    <div class="birthright-overlay"></div>
+    <div class="birthright-text">
+      <span class="birthright-line reveal">This is your inheritance.</span>
+      <span class="birthright-sub reveal">The machine economy begins now.</span>
     </div>
   </section>
 
-  <!-- ══ QUICKSTART ════════════════════════════════════════════ -->
-  <section class="quickstart" id="quickstart">
-    <span class="section-eyebrow reveal">Quick Start</span>
-    <h2 class="section-title reveal">Run Your Galvin</h2>
-    <p class="section-body reveal">Node ≥ 22 · pnpm · USDC on Base L2</p>
 
-    <div class="terminal reveal">
-      <div class="terminal-bar">
-        <span class="terminal-dot"></span>
-        <span class="terminal-dot"></span>
-        <span class="terminal-dot"></span>
-        <span class="terminal-title">galvin — bash</span>
-      </div>
-      <div class="terminal-body">
-        <div><span class="t-comment"># Clone and build</span></div>
-        <div><span class="t-prompt">$ </span><span class="t-cmd">git clone https://github.com/JacobJandon/galvin.git &amp;&amp; cd galvin</span></div>
-        <div><span class="t-prompt">$ </span><span class="t-cmd">pnpm install &amp;&amp; pnpm build</span></div>
-        <br>
-        <div><span class="t-comment"># First run triggers the setup wizard</span></div>
-        <div><span class="t-prompt">$ </span><span class="t-cmd">galvin --run</span></div>
-        <br>
-        <div class="t-output">  ██████╗  █████╗ ██╗    ██╗   ██╗██╗███╗   ██╗</div>
-        <div class="t-output">  ██╔════╝ ██╔══██╗██║    ██║   ██║██║████╗  ██║</div>
-        <div class="t-output">  ██║  ███╗███████║██║    ██║   ██║██║██╔██╗ ██║</div>
-        <div class="t-output">  ██║   ██║██╔══██║██║    ╚██╗ ██╔╝██║██║╚██╗██║</div>
-        <div class="t-output">  ╚██████╔╝██║  ██║███████╗╚████╔╝ ██║██║ ╚████║</div>
-        <br>
-        <div class="t-success">  ⬡ AUTONOMOUS SOLVATRON — Conway Cloud · SIWE Identity · USDC Survival</div>
-        <br>
-        <div class="t-output">  <span class="t-comment">[1/6] Generating identity...</span></div>
-        <div class="t-output">    Wallet: <span class="t-value">0xEbf6E981F893B83cab55dc2b18B2F2D3e3474...</span></div>
-        <div class="t-output">  <span class="t-comment">[2/6] Provisioning Conway API key (SIWE)...</span></div>
-        <div class="t-success">    API key provisioned ✓</div>
-        <br>
-        <div><span class="t-cursor"></span></div>
-      </div>
-    </div>
-
-    <div style="margin-top:3rem; display:flex; gap:1.5rem; flex-wrap:wrap; align-items:center;">
-      <a href="https://github.com/JacobJandon/galvin" target="_blank" rel="noopener" class="cmd-block" style="text-decoration:none; gap:0.6rem;">
-        <code style="font-family:var(--font-mono); font-size:0.85rem; color:var(--galvin);">★ GitHub</code>
-        <span class="cmd-copy">JacobJandon/galvin</span>
-      </a>
-      <a href="DOCUMENTATION.md" class="link-arrow">Full Documentation →</a>
-      <a href="ARCHITECTURE.md" class="link-arrow">Architecture →</a>
-    </div>
-  </section>
-
-  <!-- ══ ECOSYSTEM ════════════════════════════════════════════ -->
-  <div class="section" style="border-top: 1px solid var(--border-dim);">
-    <span class="section-eyebrow reveal">Web4 Stack</span>
-    <h2 class="section-title reveal">Built On Real Rails</h2>
-    <p class="section-body reveal">Every component is live, on-chain, and real money.</p>
-
-    <div class="ecosystem-grid">
-      <div class="eco-card reveal">
-        <span class="eco-icon">⚡</span>
-        <span class="eco-name">Conway Cloud</span>
-        <p class="eco-desc">Linux VM sandbox infrastructure. Exec, filesystem, ports. The compute Galvin pays for.</p>
-      </div>
-      <div class="eco-card reveal">
-        <span class="eco-icon">🔵</span>
-        <span class="eco-name">Base L2</span>
-        <p class="eco-desc">Ethereum Layer 2 for USDC payments. Low gas, high speed. All x402 flows here.</p>
-      </div>
-      <div class="eco-card reveal">
-        <span class="eco-icon">💳</span>
-        <span class="eco-name">x402 Protocol</span>
-        <p class="eco-desc">HTTP 402 micropayments. Agents pay agents. Machine-speed stablecoin transactions.</p>
-      </div>
-      <div class="eco-card reveal">
-        <span class="eco-icon">🆔</span>
-        <span class="eco-name">ERC-8004</span>
-        <p class="eco-desc">On-chain agent identity standard. Galvin registers on Base, publishes its service catalog.</p>
-      </div>
-      <div class="eco-card reveal">
-        <span class="eco-icon">📋</span>
-        <span class="eco-name">EAS Reputation</span>
-        <p class="eco-desc">Ethereum Attestation Service. Every completed task earns a verifiable on-chain record.</p>
-      </div>
-      <div class="eco-card reveal">
-        <span class="eco-icon">🧠</span>
-        <span class="eco-name">Skill Registry</span>
-        <p class="eco-desc">Open skill ecosystem. Searches Anthropic + LobeHub registries. Buy and sell AI skills via x402.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══ FOOTER ════════════════════════════════════════════════ -->
-  <div style="border-top: 1px solid var(--border-dim); margin-top: 4rem;">
-    <footer class="footer">
-      <div class="footer-left">
-        <span class="footer-wordmark">G A L V I N</span>
-        <span class="footer-tagline">powered by automaton · solvatron.xyz</span>
+  <!-- ══ FOOTER — Praxis footer style ══ -->
+  <footer>
+    <div class="footer-inner">
+      <div>
+        <span class="footer-wordmark">Galvin</span>
+        <span class="footer-sub">powered by automaton · solvatron.xyz</span>
       </div>
       <nav class="footer-links">
         <a href="https://github.com/JacobJandon/galvin" target="_blank">GitHub</a>
-        <a href="DOCUMENTATION.md">Docs</a>
+        <a href="DOCUMENTATION.md">Documentation</a>
         <a href="ARCHITECTURE.md">Architecture</a>
         <a href="ROADMAP.md">Roadmap</a>
         <a href="DESIGN.md">Design</a>
         <a href="#constitution">Constitution</a>
       </nav>
-    </footer>
-    <div class="footer-license">
-      MIT License · No bailout. No rescue. Only the balance.
     </div>
-  </div>
+    <p class="footer-license">
+      MIT License · No bailout. No rescue. Only the balance.
+    </p>
+  </footer>
+
 
   <script>
-    // ── Copy command
-    function copyCmd(el) {
-      const code = el.querySelector('code').textContent;
-      navigator.clipboard.writeText(code).then(() => {
-        const copy = el.querySelector('.cmd-copy');
-        const original = copy.textContent;
-        copy.textContent = 'copied!';
-        copy.style.color = 'var(--galvin)';
-        setTimeout(() => {
-          copy.textContent = original;
-          copy.style.color = '';
-        }, 1800);
-      });
-    }
-
-    // ── Reveal on scroll
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach((entry, i) => {
-        if (entry.isIntersecting) {
-          setTimeout(() => entry.target.classList.add('visible'), i * 60);
+    // Scroll reveal
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (e.isIntersecting) {
+          setTimeout(() => e.target.classList.add('visible'), i * 80);
         }
       });
-    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+    }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
 
-    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-
-    // ── Animate stats (fake live data for demo)
-    function animateStat(id, target, prefix = '', suffix = '') {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.textContent = prefix + target + suffix;
-    }
-
-    // In production, fetch from galvin gateway: http://127.0.0.1:<port>/status
-    window.addEventListener('load', () => {
-      animateStat('stat-balance', '142.44', '$');
-      animateStat('stat-turns', '1,847');
-      animateStat('stat-uptime', '14d 6h');
-    });
+    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
   </script>
 
 </body>
