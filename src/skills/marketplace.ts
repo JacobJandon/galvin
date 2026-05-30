@@ -36,6 +36,10 @@ export interface SkillListing {
   listingUrl:   string;
   publishedAt:  string;
   signature?:   string;
+  /** Origin trust level: "trusted" (official), "community", or undefined (Conway Cloud) */
+  trustLevel?:  "trusted" | "community";
+  /** Searchable tags from the skill's frontmatter or registry entry */
+  tags?:        string[];
 }
 
 // ─── Schema ──────────────────────────────────────────────────

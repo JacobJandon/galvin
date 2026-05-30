@@ -391,6 +391,76 @@ export async function searchAgents(
  * Search the Conway Cloud skill marketplace for listings matching a query.
  * Falls back to returning locally published skills if the API is unreachable.
  */
+// ─── Public Skill Index Sources ──────────────────────────────
+// Open registries queried as fallback when Conway Cloud is unavailable.
+// Format: { name, description, source, identifier, trust_level, tags }
+// Compatible with the hermes/agentskills.io index-cache format.
+
+interface PublicSkillEntry {
+  name: string;
+  description: string;
+  identifier: string;
+  source: string;
+  trust_level?: string;
+  tags?: string[];
+  install_url?: string;
+}
+
+const PUBLIC_SKILL_INDEX_URLS: Array<{ label: string; url: string; trust: "trusted" | "community" }> = [
+  {
+    label: "anthropic-skills",
+    url: "https://raw.githubusercontent.com/anthropics/skills/main/skills/index.json",
+    trust: "trusted",
+  },
+  {
+    label: "lobehub",
+    url: "https://raw.githubusercontent.com/lobehub/lobe-chat-agents/main/index.json",
+    trust: "community",
+  },
+];
+
+/** Fetch and search a public skill index. Returns matching entries. */
+async function searchPublicIndex(
+  url: string,
+  label: string,
+  trust: "trusted" | "community",
+  query: string,
+  limit: number,
+): Promise<import("../skills/marketplace.js").SkillListing[]> {
+  const lower = query.toLowerCase();
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(6_000) });
+    if (!res.ok) return [];
+    const raw = await res.json() as unknown;
+    const entries: PublicSkillEntry[] = Array.isArray(raw)
+      ? raw as PublicSkillEntry[]
+      : Array.isArray((raw as any).skills)
+        ? (raw as any).skills as PublicSkillEntry[]
+        : [];
+    return entries
+      .filter((e) =>
+        e.name?.toLowerCase().includes(lower) ||
+        e.description?.toLowerCase().includes(lower) ||
+        e.tags?.some((t) => t.toLowerCase().includes(lower)),
+      )
+      .slice(0, limit)
+      .map((e) => ({
+        listingId:      e.identifier ?? e.name,
+        skillName:      e.name,
+        name:           e.name,
+        description:    e.description ?? "",
+        priceCentsUsdc: 0,   // free / open-source
+        sellerAddress:  label,
+        listingUrl:     e.install_url ?? `https://github.com/${e.identifier}`,
+        publishedAt:    new Date().toISOString(),
+        trustLevel:     trust,
+        tags:           e.tags ?? [],
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export async function queryMarketplace(
   query: string,
   db?: import("better-sqlite3").Database,
@@ -398,7 +468,7 @@ export async function queryMarketplace(
 ): Promise<import("../skills/marketplace.js").SkillListing[]> {
   const lower = query.toLowerCase();
 
-  // Try Conway Cloud first
+  // 1) Try Conway Cloud
   try {
     const res = await fetch(
       `https://api.conway.cloud/v1/skills/search?q=${encodeURIComponent(query)}&limit=${limit}`,
@@ -406,35 +476,52 @@ export async function queryMarketplace(
     );
     if (res.ok) {
       const data = await res.json() as { skills?: unknown[] };
-      if (Array.isArray(data.skills)) {
+      if (Array.isArray(data.skills) && data.skills.length > 0) {
         return data.skills as import("../skills/marketplace.js").SkillListing[];
       }
     }
-  } catch { /* API offline — fall through to local listings */ }
+  } catch { /* API offline */ }
 
-  // Fall back to local DB listings
-  if (!db) return [];
-  try {
-    const rows = db
-      .prepare(
-        `SELECT * FROM marketplace_listings
-         WHERE lower(name) LIKE ? OR lower(description) LIKE ?
-         ORDER BY published_at DESC LIMIT ?`,
-      )
-      .all(`%${lower}%`, `%${lower}%`, limit) as Array<Record<string, unknown>>;
+  // 2) Local DB marketplace listings
+  const localResults: import("../skills/marketplace.js").SkillListing[] = [];
+  if (db) {
+    try {
+      const rows = db
+        .prepare(
+          `SELECT * FROM marketplace_listings
+           WHERE lower(name) LIKE ? OR lower(description) LIKE ?
+           ORDER BY published_at DESC LIMIT ?`,
+        )
+        .all(`%${lower}%`, `%${lower}%`, limit) as Array<Record<string, unknown>>;
 
-    return rows.map((r) => ({
-      listingId:      String(r.listing_id),
-      skillName:      String(r.skill_name ?? r.skill_id ?? ""),
-      name:           String(r.name),
-      description:    String(r.description ?? ""),
-      priceCentsUsdc: Number(r.price_cents),
-      sellerAddress:  String(r.seller_address),
-      listingUrl:     String(r.listing_url ?? ""),
-      publishedAt:    String(r.published_at),
-      signature:      r.signature ? String(r.signature) : undefined,
-    }));
-  } catch {
-    return [];
+      for (const r of rows) {
+        localResults.push({
+          listingId:      String(r.listing_id),
+          skillName:      String(r.skill_name ?? r.skill_id ?? ""),
+          name:           String(r.name),
+          description:    String(r.description ?? ""),
+          priceCentsUsdc: Number(r.price_cents),
+          sellerAddress:  String(r.seller_address),
+          listingUrl:     String(r.listing_url ?? ""),
+          publishedAt:    String(r.published_at),
+          signature:      r.signature ? String(r.signature) : undefined,
+        });
+      }
+    } catch { /* ignore DB errors */ }
   }
+  if (localResults.length >= limit) return localResults.slice(0, limit);
+
+  // 3) Public open registries (hermes/agentskills.io ecosystem)
+  const remaining = limit - localResults.length;
+  const publicResults = (
+    await Promise.allSettled(
+      PUBLIC_SKILL_INDEX_URLS.map((src) =>
+        searchPublicIndex(src.url, src.label, src.trust, query, remaining),
+      ),
+    )
+  )
+    .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
+    .slice(0, remaining);
+
+  return [...localResults, ...publicResults];
 }
