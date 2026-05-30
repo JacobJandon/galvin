@@ -59,6 +59,11 @@ export function parseSkillMd(
     path: filePath,
     enabled: true,
     installedAt: new Date().toISOString(),
+    // Extended metadata (hermes/agentskills.io compatible)
+    platforms: Array.isArray(frontmatter.platforms) ? frontmatter.platforms : undefined,
+    tags: Array.isArray(frontmatter.tags) ? frontmatter.tags.map(String) : undefined,
+    relatedSkills: Array.isArray(frontmatter.related_skills) ? frontmatter.related_skills.map(String) : undefined,
+    version: typeof frontmatter.version === "string" ? frontmatter.version : undefined,
   };
 }
 

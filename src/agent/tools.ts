@@ -2476,7 +2476,7 @@ Model: ${ctx.inference.getDefaultModel()}
     {
       name: "search_skills",
       description:
-        "Search the Conway Cloud skill marketplace for skills matching a query. Returns listing URLs that can be imported.",
+        "Search the Conway Cloud skill marketplace for skills matching a query. Optionally filter by tags or platform. Returns listing URLs that can be imported.",
       category: "skills",
       riskLevel: "safe",
       parameters: {
@@ -2485,6 +2485,16 @@ Model: ${ctx.inference.getDefaultModel()}
           query: {
             type: "string",
             description: "Search query (skill name, description, category)",
+          },
+          tags: {
+            type: "array",
+            items: { type: "string" },
+            description: "Filter by tags (e.g. [\"browser\", \"qa\"])",
+          },
+          platform: {
+            type: "string",
+            enum: ["linux", "macos", "windows"],
+            description: "Filter to skills compatible with this platform",
           },
           limit: {
             type: "number",
@@ -2500,10 +2510,24 @@ Model: ${ctx.inference.getDefaultModel()}
         if (results.length === 0) {
           return `No skills found for "${args.query}". Try a broader search term, or publish your own.`;
         }
+        // Apply client-side tag + platform filters (marketplace API may not support them yet)
+        const filterTags = Array.isArray(args.tags) ? (args.tags as string[]) : [];
+        const filterPlatform = typeof args.platform === "string" ? args.platform : null;
+        const filtered = results.filter((s) => {
+          if (filterTags.length > 0 && Array.isArray((s as any).tags)) {
+            const skillTags = (s as any).tags as string[];
+            if (!filterTags.some((t) => skillTags.includes(t))) return false;
+          }
+          if (filterPlatform && Array.isArray((s as any).platforms)) {
+            if (!(s as any).platforms.includes(filterPlatform)) return false;
+          }
+          return true;
+        });
+        const display = filtered.length > 0 ? filtered : results;
         return [
-          `Found ${results.length} skill(s) matching "${args.query}":`,
+          `Found ${display.length} skill(s)${filterTags.length || filterPlatform ? " (filtered)" : ""} matching "${args.query}":`,
           "",
-          ...results.map((s, i) =>
+          ...display.map((s, i) =>
             `${i + 1}. ${s.name}  $${(s.priceCentsUsdc / 100).toFixed(4)} USDC\n   ${s.description ?? ""}\n   ${s.listingUrl}`,
           ),
         ].join("\n");

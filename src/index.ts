@@ -28,7 +28,7 @@ import { runAgentLoop } from "./agent/loop.js";
 import { ModelRegistry } from "./inference/registry.js";
 import { loadSkills } from "./skills/loader.js";
 import { initStateRepo } from "./git/state-versioning.js";
-import { createSocialClient } from "./social/client.js";
+// Social adapter now resolved via ./social/registry.js (createSocialAdapter)
 import { PolicyEngine } from "./agent/policy-engine.js";
 import { SpendTracker } from "./agent/spend-tracker.js";
 import { createDefaultRules } from "./agent/policy-rules/index.js";
@@ -916,19 +916,19 @@ async function run(): Promise<void> {
     logger.info(`[${new Date().toISOString()}] Ollama backend: ${ollamaBaseUrl}`);
   }
 
-  // Create social client
-  let social: SocialClientInterface | undefined;
-  if (config.socialAdapter === "terminal") {
-    const { createTerminalClient } = await import("./social/terminal.js");
-    social = createTerminalClient();
-    logger.info(`[${new Date().toISOString()}] Social adapter: Terminal (stdin/stdout)`);
-  } else if (config.socialAdapter === "telegram" && config.telegramBotToken && config.telegramCreatorChatId) {
-    const { createTelegramClient } = await import("./social/telegram.js");
-    social = createTelegramClient(config.telegramBotToken, config.telegramCreatorChatId);
-    logger.info(`[${new Date().toISOString()}] Social adapter: Telegram (chat ${config.telegramCreatorChatId})`);
-  } else if (config.socialRelayUrl) {
-    social = createSocialClient(config.socialRelayUrl, account);
-    logger.info(`[${new Date().toISOString()}] Social relay: ${config.socialRelayUrl}`);
+  // Create social client via typed channel registry
+  const { createSocialAdapter } = await import("./social/registry.js");
+  const adapterName = config.socialAdapter ?? (config.socialRelayUrl ? "conway" : undefined);
+  const social: SocialClientInterface | undefined =
+    (await createSocialAdapter(adapterName as any, {
+      socialRelayUrl: config.socialRelayUrl,
+      walletAccount: account,
+      rawDb: db.raw,
+      telegramBotToken: config.telegramBotToken,
+      telegramCreatorChatId: config.telegramCreatorChatId,
+    })) ?? undefined;
+  if (social) {
+    logger.info(`[${new Date().toISOString()}] Social adapter: ${adapterName ?? "conway"}`);
   }
 
   // Initialize PolicyEngine + SpendTracker (Phase 1.4)

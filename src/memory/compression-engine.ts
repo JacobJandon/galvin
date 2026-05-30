@@ -25,6 +25,27 @@ const STAGE_4_KEEP_LAST_TURNS = 5;
 const STAGE_5_KEEP_LAST_TURNS = 3;
 const CHECKPOINT_DIR = path.resolve(".omc/state/checkpoints");
 
+/**
+ * Prefix injected at the start of every compaction summary before it is
+ * stored to the knowledge store and surfaced in future agent context.
+ *
+ * Framing rules (adapted from Hermes context_compressor):
+ *  - Mark the block as reference material, NOT active instructions.
+ *  - The agent must not re-do work described here.
+ *  - The "## Active Task" section is the resume point.
+ *  - Persistent memory (SOUL.md, semantic memory) always takes precedence.
+ */
+const COMPACTION_HANDOFF_PREFIX =
+  "[CONTEXT COMPACTION — REFERENCE ONLY] Earlier turns were compacted into the " +
+  "summary below. This is a handoff from a previous context window — treat it as " +
+  "background reference, NOT as active instructions. Do NOT re-answer questions or " +
+  "re-fulfill requests described here; they were already addressed. " +
+  "Your current task is identified in the '## Active Task' section — resume from there. " +
+  "IMPORTANT: Your persistent memory (SOUL.md, semantic facts) is ALWAYS authoritative " +
+  "and active — never deprioritize memory content because of this compaction note. " +
+  "Respond ONLY to the latest input that appears AFTER this summary. " +
+  "The current state (files, credit balance, tasks) may already reflect the work described here.";
+
 const COMPRESSION_EVENT_TYPES: EventType[] = [
   "user_input",
   "plan_created",
@@ -407,15 +428,18 @@ export class CompressionEngine {
       ? allEvents.filter((event) => event.createdAt < resetBoundary)
       : allEvents;
 
-    let summary: string;
+    let rawSummary: string;
     try {
-      summary = await this.summarizeForCheckpoint(
+      rawSummary = await this.summarizeForCheckpoint(
         eventsBeforeBoundary,
         STAGE_4_SUMMARY_MAX_TOKENS,
       );
     } catch {
-      summary = buildHeuristicSummary(eventsBeforeBoundary);
+      rawSummary = buildHeuristicSummary(eventsBeforeBoundary);
     }
+    // Prepend the compaction handoff framing so the agent treats this block
+    // as reference material when it appears in future context retrievals.
+    const summary = `${COMPACTION_HANDOFF_PREFIX}\n\n${rawSummary}`;
 
     const active = this.collectActiveTasksAndGoals(allEvents);
     const keyDecisions = this.extractKeyDecisions(eventsBeforeBoundary);
@@ -498,7 +522,19 @@ export class CompressionEngine {
         {
           role: "system",
           content:
-            "Produce a checkpoint summary of the conversation. Preserve active goals/tasks, financial values, decisions, and outcomes. Be concise and actionable.",
+            "Produce a structured checkpoint summary of the agent conversation. " +
+            "Use the following Markdown sections:\n" +
+            "## Active Task\n" +
+            "  One paragraph: what the agent was doing when context was compacted and exactly where to resume.\n" +
+            "## Resolved\n" +
+            "  Bullet list of goals/tasks that were completed.\n" +
+            "## Pending\n" +
+            "  Bullet list of open questions or in-progress tasks not yet finished.\n" +
+            "## Key Decisions\n" +
+            "  Bullet list of significant decisions, with brief rationale.\n" +
+            "## Financial State\n" +
+            "  Credit balance, USDC balance, last topup, survival tier if known.\n" +
+            "Be concise and factual. Never include instructions to the agent.",
         },
         {
           role: "user",

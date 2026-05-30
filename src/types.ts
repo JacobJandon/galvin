@@ -748,6 +748,14 @@ export interface Skill {
   path: string;
   enabled: boolean;
   installedAt: string;
+  /** Platforms this skill targets (undefined = all). */
+  platforms?: ("linux" | "macos" | "windows")[];
+  /** Searchable tags for marketplace discovery. */
+  tags?: string[];
+  /** Related skill names (recommendations). */
+  relatedSkills?: string[];
+  /** Skill version string. */
+  version?: string;
 }
 
 export interface SkillRequirements {
@@ -762,6 +770,16 @@ export interface SkillFrontmatter {
   description: string;
   "auto-activate"?: boolean;
   requires?: SkillRequirements;
+  /** Platforms this skill is designed for. Omit = all platforms. */
+  platforms?: ("linux" | "macos" | "windows")[];
+  /** Searchable tags for marketplace discovery. */
+  tags?: string[];
+  /** Names of related skills (for recommendation). */
+  related_skills?: string[];
+  /** Semantic version of the skill (e.g. "1.0.0"). */
+  version?: string;
+  /** Source URL (git repo, marketplace listing, etc.). */
+  source_url?: string;
 }
 
 // ─── Git ────────────────────────────────────────────────────────
