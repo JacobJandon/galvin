@@ -35,20 +35,40 @@ const SANDBOX_HOME = process.env.HOME || "/root";
 let WORKSPACE_DIR = process.env.GALVIN_WORKSPACE || SANDBOX_HOME;
 
 /**
- * Resolve a file path to an absolute path.
- * Relative paths resolve against WORKSPACE_DIR (not HOME).
- * In local mode this allows writes anywhere on the system.
+ * Resolve a file path to an absolute path and confine it to the sandbox.
+ * - `~` paths resolve against SANDBOX_HOME.
+ * - Relative paths resolve against WORKSPACE_DIR.
+ * - Absolute paths are taken as-is, then normalized.
+ * The resolved path must live within SANDBOX_HOME or WORKSPACE_DIR; anything
+ * outside (e.g. /etc, /tmp, ../ escapes) is blocked. This stops the agent
+ * from writing arbitrary host files via write_file.
  */
 function confinePathToSandbox(filePath: string): string | { error: string } {
-  // Resolve ~ to home
+  let resolved: string;
   if (filePath.startsWith("~")) {
-    return nodePath.join(SANDBOX_HOME, filePath.slice(1));
+    resolved = nodePath.resolve(SANDBOX_HOME, "." + filePath.slice(1));
+  } else if (nodePath.isAbsolute(filePath)) {
+    resolved = nodePath.resolve(filePath);
+  } else {
+    resolved = nodePath.resolve(WORKSPACE_DIR, filePath);
   }
-  // Resolve relative paths against workspace
-  if (!nodePath.isAbsolute(filePath)) {
-    return nodePath.resolve(WORKSPACE_DIR, filePath);
+
+  const roots = [...new Set([SANDBOX_HOME, WORKSPACE_DIR])].map((r) =>
+    nodePath.resolve(r),
+  );
+  const inside = roots.some(
+    (root) => resolved === root || resolved.startsWith(root + nodePath.sep),
+  );
+  if (!inside) {
+    const where =
+      WORKSPACE_DIR !== SANDBOX_HOME
+        ? `${SANDBOX_HOME} or workspace ${WORKSPACE_DIR}`
+        : SANDBOX_HOME;
+    return {
+      error: `Blocked: path "${filePath}" resolves to "${resolved}" which is outside the sandbox home (${where}).`,
+    };
   }
-  return filePath;
+  return resolved;
 }
 
 // Tools whose results come from external sources and need sanitization
