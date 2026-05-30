@@ -32,6 +32,32 @@ import { createLogger } from "../observability/logger.js";
 type DatabaseType = BetterSqlite3.Database;
 const logger = createLogger("heartbeat.scheduler");
 
+/**
+ * Read skill income weights synchronously from the DB.
+ * Returns a Map<skillId, 0–1 normalised weight> for task priority boosting.
+ * Returns an empty map if the skill_income_log table does not exist yet.
+ */
+function getSkillWeightsSync(db: DatabaseType): Map<string, number> {
+  try {
+    const rows = db
+      .prepare(
+        `SELECT skill_id, SUM(usdc) as total
+         FROM skill_income_log
+         WHERE ts > ?
+         GROUP BY skill_id`,
+      )
+      .all(Date.now() - 30 * 24 * 3_600_000) as Array<{ skill_id: string; total: number }>;
+    if (rows.length === 0) return new Map();
+    const max = Math.max(...rows.map((r) => r.total));
+    if (max <= 0) return new Map();
+    const weights = new Map<string, number>();
+    for (const r of rows) weights.set(r.skill_id, r.total / max);
+    return weights;
+  } catch {
+    return new Map();
+  }
+}
+
 const DEFAULT_TASK_TIMEOUT_MS = 30_000;
 const LEASE_TTL_MS = 60_000;
 const HISTORY_ID_COUNTER = { value: 0 };
@@ -120,7 +146,7 @@ export class DurableScheduler {
     const schedule = getHeartbeatSchedule(this.db);
     const now = new Date();
 
-    return schedule.filter((row) => {
+    const due = schedule.filter((row) => {
       // Skip disabled tasks
       if (!row.enabled) return false;
 
@@ -165,6 +191,24 @@ export class DurableScheduler {
 
       return false;
     });
+
+    // Economic memory: boost priority of tasks whose name matches a high-earning
+    // skill ID. This implements Feature 1 (Economic Memory That Compounds).
+    // Uses inline SQL to stay synchronous (no dynamic import in sync method).
+    try {
+      const weights = getSkillWeightsSync(this.db);
+      if (weights.size > 0) {
+        due.sort((a, b) => {
+          const priDiff = a.priority - b.priority;
+          if (priDiff !== 0) return priDiff;
+          const wa = weights.get(a.taskName) ?? 0;
+          const wb = weights.get(b.taskName) ?? 0;
+          return wb - wa; // descending: higher weight first
+        });
+      }
+    } catch { /* DB not available — use default order */ }
+
+    return due;
   }
 
   /**
