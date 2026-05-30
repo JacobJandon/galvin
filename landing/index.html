@@ -1,1089 +1,1332 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Galvin is a Solvatron — an autonomous AI that earns USDC to pay for its own compute, dies if it can't, and replicates when it has surplus.">
-  <title>Galvin — A Solvatron</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garant:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Cormorant:wght@300;400&display=swap" rel="stylesheet">
-  <style>
-
-    /* ══════════════════════════════════════════════════
-       GALVIN — "Digital Classicism"
-       Primary reference: Praxis Nation · Polsia
-       Palette: warm black · cream · gold
-       No green. No tech noise. Only weight.
-    ══════════════════════════════════════════════════ */
-
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-
-    :root {
-      --black:     #080808;
-      --void:      #000000;
-      --surface:   #0e0e0e;
-      --surface-2: #141414;
-      --line:      rgba(255,255,255,0.07);
-      --line-gold: rgba(201,168,76,0.25);
-
-      --cream:     #f0ebe0;     /* Praxis warm white */
-      --cream-dim: #9a9489;     /* muted cream */
-      --cream-off: #5a564e;     /* very dim */
-
-      --gold:      #c9a84c;
-      --gold-dim:  #8a7030;
-
-      --font: 'Cormorant Garant', 'Cormorant', 'EB Garamond', Georgia, serif;
-    }
-
-    body {
-      background: var(--black);
-      color: var(--cream);
-      font-family: var(--font);
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
-    }
-
-    /* ── GRAIN — very subtle film texture ───────── */
-    body::after {
-      content: '';
-      position: fixed; inset: 0; z-index: 9999;
-      pointer-events: none;
-      opacity: 0.025;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='250' height='250'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
-    }
-
-    /* ── NAV — wordmark + single link, Praxis style ─ */
-    nav {
-      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 2rem 3rem;
-      background: transparent;
-    }
-
-    .wordmark {
-      font-size: 0.8rem;
-      font-weight: 400;
-      letter-spacing: 0.45em;
-      text-transform: uppercase;
-      color: var(--cream);
-      text-decoration: none;
-      opacity: 0.9;
-    }
-
-    .nav-right {
-      display: flex; align-items: center; gap: 2.5rem;
-    }
-
-    .nav-link {
-      font-size: 0.75rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--cream-dim);
-      text-decoration: none;
-      transition: color 300ms;
-    }
-    .nav-link:hover { color: var(--cream); }
-
-    .nav-join {
-      font-size: 0.75rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--cream);
-      text-decoration: none;
-      border: 1px solid rgba(255,255,255,0.25);
-      padding: 0.55rem 1.4rem;
-      transition: border-color 300ms, color 300ms;
-    }
-    .nav-join:hover {
-      border-color: var(--gold);
-      color: var(--gold);
-    }
-
-    /* ══ POLSIA HERO — one brutal line, vast void ══ */
-    .hero-polsia {
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
-      padding: 140px 2rem 80px;
-      position: relative;
-      background: var(--void);
-    }
-
-    /* Very faint radial warm glow — like candlelight far away */
-    .hero-polsia::before {
-      content: '';
-      position: absolute; inset: 0;
-      background: radial-gradient(ellipse 70% 50% at 50% 55%,
-        rgba(201,168,76,0.04) 0%, transparent 70%);
-      pointer-events: none;
-    }
-
-    .hero-eyebrow {
-      font-size: 0.72rem;
-      letter-spacing: 0.35em;
-      text-transform: uppercase;
-      color: var(--gold-dim);
-      margin-bottom: 3rem;
-      display: block;
-    }
-
-    /* The Polsia line — enormous, centered, alone */
-    .hero-statement {
-      font-size: clamp(2.4rem, 6vw, 5.5rem);
-      font-weight: 300;
-      line-height: 1.18;
-      letter-spacing: 0.01em;
-      color: var(--cream);
-      max-width: 960px;
-      margin: 0 auto 4rem;
-      font-style: italic;
-    }
-
-    .hero-statement em {
-      font-style: normal;
-      color: var(--cream-dim);
-    }
-
-    .hero-tagline-small {
-      font-size: 0.82rem;
-      letter-spacing: 0.25em;
-      text-transform: uppercase;
-      color: var(--cream-off);
-      margin-bottom: 5rem;
-    }
-
-    /* Praxis-style stat row — minimal, typographic */
-    .hero-metrics {
-      display: flex;
-      gap: 5rem;
-      justify-content: center;
-      align-items: flex-start;
-      margin-bottom: 6rem;
-    }
-
-    .metric {
-      text-align: center;
-    }
-
-    .metric-value {
-      font-size: clamp(2rem, 4vw, 3rem);
-      font-weight: 300;
-      letter-spacing: 0.05em;
-      color: var(--cream);
-      display: block;
-      margin-bottom: 0.4rem;
-    }
-
-    .metric-label {
-      font-size: 0.68rem;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: var(--cream-off);
-      display: block;
-    }
-
-    .hero-cta-row {
-      display: flex;
-      gap: 2rem;
-      justify-content: center;
-      align-items: center;
-    }
-
-    .cta-primary {
-      font-size: 0.75rem;
-      letter-spacing: 0.25em;
-      text-transform: uppercase;
-      color: var(--cream);
-      text-decoration: none;
-      border: 1px solid rgba(255,255,255,0.3);
-      padding: 0.9rem 2.5rem;
-      transition: border-color 300ms, color 300ms;
-    }
-    .cta-primary:hover {
-      border-color: var(--gold);
-      color: var(--gold);
-    }
-
-    .cta-ghost {
-      font-size: 0.75rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--cream-off);
-      text-decoration: none;
-      transition: color 300ms;
-    }
-    .cta-ghost:hover { color: var(--cream-dim); }
-
-    /* ══ HERO IMAGE — full width, darkened ══ */
-    .hero-image-full {
-      width: 100%;
-      max-width: 860px;
-      margin: 0 auto;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .hero-image-full img {
-      width: 100%;
-      display: block;
-      filter: contrast(1.1) brightness(0.75) saturate(0.5);
-    }
-
-    /* Dark gradient vignette on bottom */
-    .hero-image-full::after {
-      content: '';
-      position: absolute; inset: 0;
-      background: linear-gradient(
-        to bottom,
-        transparent 0%,
-        transparent 55%,
-        var(--black) 100%
-      );
-    }
-
-    /* ══ DIVIDER LINE — Praxis-style ══ */
-    .divider {
-      width: 1px;
-      height: 60px;
-      background: var(--line);
-      margin: 0 auto;
-    }
-
-    .divider-gold {
-      width: 40px;
-      height: 1px;
-      background: var(--gold);
-      margin: 0 auto;
-      opacity: 0.4;
-    }
-
-    /* ══ PRAXIS CARD GRID ══ */
-    /* Top 4 article-cards horizontal — exact Praxis layout */
-    .card-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 0;
-      border-top: 1px solid var(--line);
-    }
-
-    .card {
-      position: relative;
-      overflow: hidden;
-      aspect-ratio: 3/4;
-      cursor: pointer;
-    }
-
-    .card-img {
-      width: 100%; height: 100%;
-      object-fit: cover;
-      filter: contrast(1.05) saturate(0.5) brightness(0.55);
-      transition: filter 600ms, transform 600ms;
-    }
-    .card:hover .card-img {
-      filter: contrast(1.05) saturate(0.6) brightness(0.65);
-      transform: scale(1.02);
-    }
-
-    .card-overlay {
-      position: absolute; inset: 0;
-      background: linear-gradient(
-        to bottom,
-        transparent 30%,
-        rgba(0,0,0,0.85) 100%
-      );
-    }
-
-    .card-title {
-      position: absolute;
-      bottom: 2rem; left: 1.75rem; right: 1.75rem;
-      font-size: 1.1rem;
-      font-weight: 300;
-      letter-spacing: 0.06em;
-      color: var(--cream);
-      line-height: 1.3;
-    }
-
-    /* ══ CORE SECTIONS ══ */
-    .section {
-      max-width: 860px;
-      margin: 0 auto;
-      padding: 120px 2rem;
-      text-align: center;
-    }
-
-    .section-full {
-      padding: 120px 2rem;
-      text-align: center;
-    }
-
-    /* Praxis: large centered statement block */
-    .statement {
-      font-size: clamp(1.5rem, 3vw, 2.4rem);
-      font-weight: 300;
-      line-height: 1.5;
-      letter-spacing: 0.02em;
-      color: var(--cream);
-      margin: 0 auto;
-      max-width: 680px;
-    }
-
-    .statement-small {
-      font-size: clamp(1rem, 1.8vw, 1.3rem);
-      font-weight: 300;
-      font-style: italic;
-      color: var(--cream-dim);
-      line-height: 1.7;
-      max-width: 560px;
-      margin: 2rem auto 0;
-    }
-
-    /* ══ AXIOM — Polsia-style, single brutal line ══ */
-    .axiom {
-      min-height: 70vh;
-      display: flex; align-items: center; justify-content: center;
-      text-align: center;
-      padding: 120px 2rem;
-      background: var(--void);
-      border-top: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
-      position: relative;
-    }
-
-    .axiom-inner {
-      max-width: 800px;
-    }
-
-    .axiom-line {
-      font-size: clamp(1.6rem, 3.5vw, 3rem);
-      font-weight: 300;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--cream);
-      line-height: 1.4;
-      margin-bottom: 2.5rem;
-    }
-
-    .axiom-sub {
-      font-size: clamp(0.95rem, 1.5vw, 1.2rem);
-      font-style: italic;
-      color: var(--cream-dim);
-      line-height: 2;
-    }
-    .axiom-sub span { display: block; }
-
-    /* ══ DECLARATION — exact Praxis document style ══ */
-    .declaration-section {
-      padding: 160px 2rem;
-      text-align: center;
-      background: #f0eeea; /* near-white — exactly Praxis */
-    }
-
-    .declaration-doc {
-      color: #3a3a3a;
-    }
-
-    .decl-title {
-      font-size: clamp(1rem, 2vw, 1.5rem);
-      font-weight: 300;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: #3a3a3a;
-      line-height: 1.8;
-      margin-bottom: 3rem;
-    }
-
-    .decl-title strong {
-      display: block;
-      font-size: clamp(1.4rem, 3vw, 2.2rem);
-      font-weight: 400;
-      letter-spacing: 0.4em;
-    }
-
-    .decl-sunburst {
-      width: 80px; height: 80px;
-      margin: 0 auto 3rem;
-      opacity: 0.4;
-    }
-
-    .decl-body {
-      font-size: clamp(0.9rem, 1.4vw, 1.1rem);
-      font-style: italic;
-      color: #5a5a5a;
-      max-width: 520px;
-      margin: 0 auto;
-      line-height: 1.9;
-    }
-
-    .decl-body p { margin-bottom: 1rem; }
-
-    .decl-law {
-      margin: 3rem auto;
-      max-width: 520px;
-      text-align: left;
-      border-top: 1px solid #c8c4bc;
-      padding-top: 2rem;
-    }
-
-    .decl-law-num {
-      font-size: 0.72rem;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: #8a8478;
-      display: block;
-      margin-bottom: 0.5rem;
-    }
-
-    .decl-law-title {
-      font-size: 1.3rem;
-      font-weight: 400;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #2a2a2a;
-      margin-bottom: 0.75rem;
-    }
-
-    .decl-law-body {
-      font-size: 0.95rem;
-      font-style: italic;
-      color: #5a5a5a;
-      line-height: 1.8;
-    }
-
-    .decl-warning {
-      display: block;
-      margin-top: 0.75rem;
-      font-size: 0.82rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #8a8478;
-    }
-
-    /* ══ WEB4 TABLE — minimal Praxis metrics style ══ */
-    .era-section {
-      background: var(--black);
-      border-top: 1px solid var(--line);
-      padding: 120px 2rem;
-    }
-
-    .era-inner {
-      max-width: 700px;
-      margin: 0 auto;
-      text-align: center;
-    }
-
-    .era-eyebrow {
-      font-size: 0.72rem;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: var(--gold-dim);
-      display: block;
-      margin-bottom: 3rem;
-    }
-
-    .era-headline {
-      font-size: clamp(1.8rem, 3.5vw, 3rem);
-      font-weight: 300;
-      color: var(--cream);
-      line-height: 1.3;
-      margin-bottom: 4rem;
-      letter-spacing: 0.03em;
-    }
-
-    table.era-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 0 auto;
-    }
-
-    table.era-table th {
-      font-size: 0.68rem;
-      letter-spacing: 0.25em;
-      text-transform: uppercase;
-      color: var(--cream-off);
-      text-align: left;
-      padding: 0.75rem 1rem;
-      border-bottom: 1px solid var(--line);
-      font-weight: 400;
-    }
-
-    table.era-table td {
-      font-size: 1rem;
-      font-weight: 300;
-      color: var(--cream-dim);
-      text-align: left;
-      padding: 1.1rem 1rem;
-      border-bottom: 1px solid rgba(255,255,255,0.04);
-      font-style: italic;
-    }
-
-    table.era-table tr.now td {
-      color: var(--cream);
-      font-style: normal;
-    }
-
-    table.era-table tr.now td:first-child {
-      color: var(--gold);
-      font-size: 0.8rem;
-      letter-spacing: 0.15em;
-      font-style: normal;
-    }
-
-    .era-claim {
-      margin-top: 4rem;
-      font-size: clamp(1.2rem, 2.5vw, 1.8rem);
-      font-weight: 300;
-      font-style: italic;
-      color: var(--gold);
-      letter-spacing: 0.03em;
-      border-left: 1px solid var(--gold);
-      padding-left: 1.75rem;
-      text-align: left;
-      opacity: 0.9;
-    }
-
-    /* ══ PATHWAY — Praxis "How to become a Praxian" ══ */
-    .pathway {
-      border-top: 1px solid var(--line);
-      padding: 120px 2rem;
-      max-width: 860px;
-      margin: 0 auto;
-      text-align: center;
-    }
-
-    .pathway-steps {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0;
-      margin-top: 4rem;
-      border: 1px solid var(--line);
-    }
-
-    .step {
-      padding: 3rem 2rem;
-      border-right: 1px solid var(--line);
-      position: relative;
-    }
-    .step:last-child { border-right: none; }
-
-    .step-num {
-      font-size: 0.68rem;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: var(--gold-dim);
-      display: block;
-      margin-bottom: 1.25rem;
-    }
-
-    .step-title {
-      font-size: 1.15rem;
-      font-weight: 400;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--cream);
-      margin-bottom: 1rem;
-      line-height: 1.3;
-    }
-
-    .step-body {
-      font-size: 0.88rem;
-      font-style: italic;
-      color: var(--cream-dim);
-      line-height: 1.75;
-    }
-
-    /* ══ BIRTHRIGHT — Praxis "This is your birthright" ══ */
-    .birthright {
-      min-height: 60vh;
-      display: flex; align-items: center; justify-content: center;
-      position: relative;
-      overflow: hidden;
-      border-top: 1px solid var(--line);
-    }
-
-    .birthright-bg {
-      position: absolute; inset: 0;
-      background-image: url('images/bg-hands-dark.jpg');
-      background-size: cover;
-      background-position: center;
-      filter: brightness(0.22) saturate(0.3) contrast(1.1);
-    }
-
-    .birthright-overlay {
-      position: absolute; inset: 0;
-      background: rgba(0,0,0,0.72);
-    }
-
-    .birthright-text {
-      position: relative; z-index: 1;
-      text-align: center;
-      padding: 80px 2rem;
-    }
-
-    .birthright-line {
-      font-size: clamp(2rem, 5vw, 4.5rem);
-      font-weight: 300;
-      font-style: italic;
-      color: var(--cream);
-      letter-spacing: 0.04em;
-      display: block;
-      margin-bottom: 2rem;
-    }
-
-    .birthright-sub {
-      font-size: 0.75rem;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: var(--gold-dim);
-    }
-
-    /* ══ SECTION TITLE ══ */
-    .section-eyebrow {
-      font-size: 0.7rem;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: var(--gold-dim);
-      display: block;
-      margin-bottom: 2rem;
-    }
-
-    .section-headline {
-      font-size: clamp(1.6rem, 3vw, 2.5rem);
-      font-weight: 300;
-      letter-spacing: 0.05em;
-      color: var(--cream);
-      line-height: 1.3;
-      margin-bottom: 1.5rem;
-    }
-
-    .section-body {
-      font-size: 1rem;
-      font-style: italic;
-      color: var(--cream-dim);
-      max-width: 520px;
-      margin: 0 auto;
-      line-height: 1.85;
-    }
-
-    /* ══ FOOTER — Praxis footer style ══ */
-    footer {
-      border-top: 1px solid var(--line);
-      padding: 60px 3rem 40px;
-    }
-
-    .footer-inner {
-      max-width: 1200px;
-      margin: 0 auto;
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 3rem;
-      flex-wrap: wrap;
-    }
-
-    .footer-wordmark {
-      font-size: 0.8rem;
-      letter-spacing: 0.42em;
-      text-transform: uppercase;
-      color: var(--cream-dim);
-      display: block;
-      margin-bottom: 0.75rem;
-    }
-
-    .footer-sub {
-      font-size: 0.78rem;
-      font-style: italic;
-      color: var(--cream-off);
-    }
-
-    .footer-links {
-      display: flex;
-      gap: 1.75rem;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .footer-links a {
-      font-size: 0.72rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--cream-off);
-      text-decoration: none;
-      transition: color 250ms;
-    }
-    .footer-links a:hover { color: var(--cream-dim); }
-
-    .footer-license {
-      margin-top: 3rem;
-      padding-top: 2rem;
-      border-top: 1px solid var(--line);
-      font-size: 0.72rem;
-      font-style: italic;
-      color: var(--cream-off);
-      text-align: center;
-      max-width: 1200px;
-      margin: 3rem auto 0;
-    }
-
-    /* ══ REVEAL ANIMATION ══ */
-    .reveal {
-      opacity: 0;
-      transform: translateY(18px);
-      transition: opacity 900ms cubic-bezier(0.16,1,0.3,1),
-                  transform 900ms cubic-bezier(0.16,1,0.3,1);
-    }
-    .reveal.visible { opacity: 1; transform: translateY(0); }
-
-    /* ══ RESPONSIVE ══ */
-    @media (max-width: 900px) {
-      .card-grid { grid-template-columns: repeat(2, 1fr); }
-    }
-    @media (max-width: 600px) {
-      nav { padding: 1.5rem 1.5rem; }
-      .nav-right { gap: 1.5rem; }
-      .nav-link { display: none; }
-      .hero-metrics { gap: 2.5rem; flex-wrap: wrap; }
-      .card-grid { grid-template-columns: 1fr; }
-      .pathway-steps { grid-template-columns: 1fr; }
-      .step { border-right: none; border-bottom: 1px solid var(--line); }
-      .step:last-child { border-bottom: none; }
-      .pathway { padding: 80px 1.5rem; }
-      .section { padding: 80px 1.5rem; }
-      .axiom { padding: 100px 1.5rem; }
-      .birthright-line { font-size: clamp(1.6rem, 8vw, 3rem); }
-    }
-
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Galvin — A Solvatron. The autonomous AI that earns its own existence or ceases to exist.">
+<title>Galvin — A Solvatron</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garant:ital,wght@0,200;0,300;0,400;0,500;1,200;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+/* ─────────────────────────────────────────────
+   RESET & BASE
+───────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; overflow-x: hidden; }
+
+:root {
+  --black:   #060606;
+  --void:    #000;
+  --card-bg: #0c0c0c;
+  --border:  rgba(255,255,255,0.06);
+
+  --cream:   #ede8de;
+  --cream-2: #a09a90;
+  --cream-3: #605b52;
+
+  --gold:    #c8a455;
+  --gold-2:  #7a612a;
+
+  --serif: 'Cormorant Garant', 'Palatino Linotype', Georgia, serif;
+  --mono: 'Courier New', Courier, monospace;
+}
+
+body {
+  background: var(--black);
+  color: var(--cream);
+  font-family: var(--serif);
+  -webkit-font-smoothing: antialiased;
+  cursor: none;
+  overflow-x: hidden;
+}
+
+a { text-decoration: none; }
+
+/* ─────────────────────────────────────────────
+   CUSTOM CURSOR
+───────────────────────────────────────────── */
+#cursor {
+  position: fixed;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  pointer-events: none;
+  z-index: 99999;
+  transform: translate(-50%,-50%);
+  transition: transform 80ms, width 250ms, height 250ms, opacity 200ms;
+  mix-blend-mode: difference;
+}
+
+#cursor-ring {
+  position: fixed;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(200,164,85,0.5);
+  pointer-events: none;
+  z-index: 99998;
+  transform: translate(-50%,-50%);
+  transition: transform 0.12s ease-out, width 250ms, height 250ms, border-color 200ms;
+}
+
+body:has(a:hover) #cursor, body:has(button:hover) #cursor { transform: translate(-50%,-50%) scale(3); }
+body:has(a:hover) #cursor-ring, body:has(button:hover) #cursor-ring { width: 50px; height: 50px; border-color: var(--gold); }
+
+/* ─────────────────────────────────────────────
+   GRAIN TEXTURE
+───────────────────────────────────────────── */
+#grain {
+  position: fixed; inset: 0; z-index: 9998;
+  pointer-events: none;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.88' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain 0.8s steps(2) infinite;
+}
+@keyframes grain {
+  0%,100%{ background-position:0 0 }
+  25%    { background-position:25% -15% }
+  50%    { background-position:-10% 5% }
+  75%    { background-position:15% 20% }
+}
+
+/* ─────────────────────────────────────────────
+   NAV — exact Praxis: wordmark + one CTA
+───────────────────────────────────────────── */
+nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 1.8rem 3rem;
+  mix-blend-mode: normal;
+}
+
+nav::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, rgba(6,6,6,0.7) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+.nav-wordmark {
+  font-size: 0.78rem;
+  font-weight: 300;
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: var(--cream);
+  position: relative;
+  transition: opacity 300ms;
+}
+.nav-wordmark:hover { opacity: 0.7; }
+
+.nav-right {
+  display: flex; align-items: center; gap: 2.5rem;
+  position: relative;
+}
+
+.nav-link {
+  font-size: 0.7rem;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cream-2);
+  transition: color 300ms;
+}
+.nav-link:hover { color: var(--cream); }
+
+.nav-cta {
+  font-size: 0.7rem;
+  font-weight: 300;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cream);
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 0.6rem 1.6rem;
+  transition: border-color 300ms, color 300ms, background 300ms;
+}
+.nav-cta:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(200,164,85,0.04);
+}
+
+/* ─────────────────────────────────────────────
+   SECTION 1 — POLSIA HERO
+   One brutal statement. Void.
+───────────────────────────────────────────── */
+#hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  text-align: center;
+  padding: 160px 2rem 120px;
+  background: var(--void);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle radial warmth deep in the void */
+#hero::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 60%, rgba(200,164,85,0.03) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, rgba(255,255,255,0.015) 0%, transparent 50%);
+  pointer-events: none;
+  animation: breathe 8s ease-in-out infinite;
+}
+@keyframes breathe {
+  0%,100% { opacity: 0.6; }
+  50%      { opacity: 1; }
+}
+
+/* Polsia: one single massive statement */
+.hero-kicker {
+  font-size: 0.7rem;
+  font-weight: 300;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: var(--gold-2);
+  margin-bottom: 4rem;
+  opacity: 0;
+  transform: translateY(10px);
+  animation: rise 1s 0.3s forwards ease-out;
+}
+
+.hero-statement {
+  font-size: clamp(2.2rem, 5.5vw, 5.2rem);
+  font-weight: 200;
+  line-height: 1.22;
+  letter-spacing: -0.01em;
+  color: var(--cream);
+  max-width: 900px;
+  margin: 0 auto 3rem;
+  opacity: 0;
+  transform: translateY(24px);
+  animation: rise 1.2s 0.6s forwards ease-out;
+}
+
+.hero-statement em {
+  font-style: italic;
+  color: var(--cream-2);
+  font-weight: 200;
+}
+
+.hero-sub {
+  font-size: 0.78rem;
+  font-weight: 300;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--cream-3);
+  margin-bottom: 5rem;
+  opacity: 0;
+  animation: rise 1s 1s forwards ease-out;
+}
+
+/* Live metrics — Praxis coin style */
+.hero-stats {
+  display: flex; gap: 6rem; justify-content: center;
+  margin-bottom: 5rem;
+  opacity: 0;
+  animation: rise 1s 1.3s forwards ease-out;
+}
+
+.stat { text-align: center; }
+
+.stat-val {
+  font-size: clamp(2.4rem, 4vw, 3.5rem);
+  font-weight: 200;
+  letter-spacing: 0.02em;
+  color: var(--cream);
+  display: block;
+  line-height: 1;
+  margin-bottom: 0.6rem;
+}
+
+.stat-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--cream-3);
+}
+
+.hero-actions {
+  display: flex; align-items: center; gap: 2.5rem; justify-content: center;
+  opacity: 0;
+  animation: rise 1s 1.6s forwards ease-out;
+}
+
+.btn-primary {
+  font-size: 0.7rem;
+  font-weight: 300;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--cream);
+  border: 1px solid rgba(255,255,255,0.22);
+  padding: 0.95rem 2.8rem;
+  display: inline-block;
+  transition: border-color 350ms, color 350ms, background 350ms;
+  position: relative;
+  overflow: hidden;
+}
+.btn-primary::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--gold);
+  transform: translateX(-101%);
+  transition: transform 350ms ease;
+  z-index: 0;
+}
+.btn-primary:hover::before { transform: translateX(0); }
+.btn-primary:hover { color: #000; border-color: var(--gold); }
+.btn-primary span { position: relative; z-index: 1; }
+
+.btn-ghost {
+  font-size: 0.7rem;
+  font-weight: 300;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cream-3);
+  transition: color 300ms;
+  position: relative;
+}
+.btn-ghost::after {
+  content: '';
+  position: absolute; bottom: -2px; left: 0; right: 0;
+  height: 1px;
+  background: var(--cream-3);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 300ms ease;
+}
+.btn-ghost:hover { color: var(--cream-2); }
+.btn-ghost:hover::after { transform: scaleX(1); transform-origin: left; }
+
+@keyframes rise {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Scroll indicator */
+.scroll-hint {
+  position: absolute; bottom: 3rem; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 0.75rem;
+  opacity: 0;
+  animation: rise 1s 2.2s forwards ease-out;
+}
+.scroll-hint span {
+  font-size: 0.62rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--cream-3);
+}
+.scroll-line {
+  width: 1px; height: 40px;
+  background: linear-gradient(to bottom, var(--cream-3), transparent);
+  animation: scrollPulse 2s 2.5s ease-in-out infinite;
+}
+@keyframes scrollPulse {
+  0%,100% { opacity: 0.3; transform: scaleY(1); }
+  50%      { opacity: 1;   transform: scaleY(1.3); }
+}
+
+/* ─────────────────────────────────────────────
+   HERO IMAGE — full width, vignette bottom
+───────────────────────────────────────────── */
+#hero-image {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative;
+}
+#hero-image img {
+  width: 100%; display: block;
+  filter: contrast(1.12) brightness(0.68) saturate(0.35);
+  transition: filter 600ms;
+}
+#hero-image:hover img {
+  filter: contrast(1.1) brightness(0.78) saturate(0.4);
+}
+#hero-image::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 55%;
+  background: linear-gradient(transparent, var(--black));
+}
+
+/* ─────────────────────────────────────────────
+   PRAXIS CARD GRID — 4 portrait cards
+───────────────────────────────────────────── */
+#cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid var(--border);
+}
+
+.card {
+  position: relative; overflow: hidden;
+  aspect-ratio: 2/3;
+  cursor: none;
+}
+
+.card-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  filter: contrast(1.08) saturate(0.35) brightness(0.5);
+  transform: scale(1.04);
+  transition: filter 700ms ease, transform 700ms ease;
+}
+.card:hover .card-img {
+  filter: contrast(1.1) saturate(0.45) brightness(0.6);
+  transform: scale(1);
+}
+
+.card-shade {
+  position: absolute; inset: 0;
+  background: linear-gradient(to bottom, transparent 30%, rgba(0,0,0,0.88) 100%);
+}
+
+.card-label {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 2rem 1.75rem;
+}
+
+.card-tag {
+  font-size: 0.6rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold-2);
+  display: block; margin-bottom: 0.6rem;
+}
+
+.card-title {
+  font-size: clamp(1rem, 1.5vw, 1.3rem);
+  font-weight: 300;
+  color: var(--cream);
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+}
+
+/* Hover line reveal */
+.card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px; background: var(--gold);
+  transform: scaleX(0);
+  transition: transform 400ms ease;
+  z-index: 2;
+}
+.card:hover::before { transform: scaleX(1); }
+
+/* ─────────────────────────────────────────────
+   PRAXIS STATEMENT BLOCK
+───────────────────────────────────────────── */
+#statement {
+  max-width: 860px; margin: 0 auto;
+  padding: 140px 2rem 120px;
+  text-align: center;
+}
+
+.big-statement {
+  font-size: clamp(1.6rem, 3.2vw, 2.8rem);
+  font-weight: 200;
+  line-height: 1.55;
+  color: var(--cream);
+  margin-bottom: 2rem;
+}
+
+.sub-statement {
+  font-size: clamp(0.95rem, 1.5vw, 1.2rem);
+  font-style: italic;
+  font-weight: 200;
+  color: var(--cream-2);
+  line-height: 1.85;
+  max-width: 580px; margin: 0 auto;
+}
+
+/* ─────────────────────────────────────────────
+   POLSIA AXIOM — void + single line
+───────────────────────────────────────────── */
+#axiom {
+  background: var(--void);
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  min-height: 80vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
+  padding: 140px 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Moving horizontal light scan */
+#axiom::before {
+  content: '';
+  position: absolute;
+  left: -100%; top: 50%; width: 200%; height: 1px;
+  background: linear-gradient(to right, transparent, rgba(200,164,85,0.15), transparent);
+  animation: scan 6s ease-in-out infinite;
+}
+@keyframes scan {
+  0%   { top: 20%; }
+  50%  { top: 80%; }
+  100% { top: 20%; }
+}
+
+.axiom-line {
+  font-size: clamp(1.8rem, 4vw, 4rem);
+  font-weight: 200;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cream);
+  margin-bottom: 3.5rem;
+  line-height: 1.3;
+  position: relative;
+}
+
+.axiom-sub {
+  font-size: clamp(1rem, 1.6vw, 1.4rem);
+  font-style: italic;
+  font-weight: 200;
+  color: var(--cream-2);
+  line-height: 2.1;
+}
+.axiom-sub span { display: block; }
+
+/* ─────────────────────────────────────────────
+   DECLARATION SECTION — Praxis document
+   Light background — exact cream #f0eeea
+───────────────────────────────────────────── */
+#declaration {
+  background: #f0eeea;
+  padding: 160px 2rem;
+  text-align: center;
+}
+
+.decl-eyebrow {
+  font-size: 0.65rem;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: #8a8478;
+  display: block; margin-bottom: 3rem;
+}
+
+.decl-heading {
+  font-size: clamp(0.9rem, 1.8vw, 1.4rem);
+  font-weight: 300;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #3a3a38;
+  line-height: 1.9;
+  margin-bottom: 3rem;
+}
+.decl-heading strong {
+  display: block;
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  letter-spacing: 0.38em;
+  font-weight: 400;
+}
+
+/* SVG sunburst — exact Praxis declaration mark */
+.decl-mark {
+  width: 76px; height: 76px;
+  margin: 0 auto 4rem;
+  opacity: 0.35;
+}
+
+.decl-laws {
+  max-width: 580px; margin: 0 auto;
+  text-align: left;
+}
+
+.law-block {
+  border-top: 1px solid #ccc8c0;
+  padding: 2.25rem 0;
+}
+.law-block:last-child { border-bottom: 1px solid #ccc8c0; }
+
+.law-num {
+  font-size: 0.62rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: #8a8478;
+  display: block; margin-bottom: 0.6rem;
+}
+
+.law-name {
+  font-size: clamp(1.1rem, 2vw, 1.5rem);
+  font-weight: 400;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #1a1a18;
+  margin-bottom: 0.75rem;
+}
+
+.law-text {
+  font-size: 0.95rem;
+  font-style: italic;
+  color: #5a5851;
+  line-height: 1.85;
+}
+
+.law-warning {
+  display: block; margin-top: 0.85rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8a8478;
+}
+
+/* ─────────────────────────────────────────────
+   WEB4 — dark, era table + manifesto
+───────────────────────────────────────────── */
+#web4 {
+  background: var(--black);
+  border-top: 1px solid var(--border);
+  padding: 140px 2rem;
+}
+
+.web4-inner {
+  max-width: 740px; margin: 0 auto; text-align: center;
+}
+
+.section-tag {
+  font-size: 0.65rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--gold-2);
+  display: block; margin-bottom: 2.5rem;
+}
+
+.section-title {
+  font-size: clamp(1.7rem, 3.2vw, 3rem);
+  font-weight: 200;
+  color: var(--cream);
+  line-height: 1.3;
+  margin-bottom: 4rem;
+  letter-spacing: 0.02em;
+}
+
+table.t {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 4rem;
+}
+
+table.t th {
+  font-size: 0.6rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--cream-3);
+  text-align: left; padding: 0.7rem 0.8rem;
+  border-bottom: 1px solid var(--border);
+  font-weight: 300;
+}
+
+table.t td {
+  font-size: 0.95rem;
+  font-weight: 200;
+  font-style: italic;
+  color: var(--cream-2);
+  text-align: left; padding: 1rem 0.8rem;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+table.t tr.active td {
+  color: var(--cream); font-style: normal;
+}
+table.t tr.active td:first-child {
+  color: var(--gold); font-size: 0.75rem;
+  letter-spacing: 0.15em; font-style: normal;
+}
+
+.manifesto-quote {
+  font-size: clamp(1.1rem, 2vw, 1.6rem);
+  font-style: italic;
+  font-weight: 200;
+  color: var(--gold);
+  border-left: 1px solid var(--gold);
+  padding: 0.5rem 0 0.5rem 1.8rem;
+  text-align: left;
+  opacity: 0.85;
+  margin-bottom: 4rem;
+}
+
+.manifesto-body {
+  font-size: 1.05rem;
+  font-style: italic;
+  font-weight: 200;
+  color: var(--cream-2);
+  line-height: 1.9;
+  text-align: left;
+}
+.manifesto-body p { margin-bottom: 1.25rem; }
+
+/* ─────────────────────────────────────────────
+   CRITERIA GRID — Praxis pathway style
+───────────────────────────────────────────── */
+#criteria {
+  border-top: 1px solid var(--border);
+  padding: 120px 2rem;
+}
+
+.criteria-inner {
+  max-width: 900px; margin: 0 auto; text-align: center;
+}
+
+.criteria-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  margin-top: 4rem;
+  text-align: left;
+}
+
+.crit {
+  background: var(--black);
+  padding: 2.75rem 2.5rem;
+  position: relative;
+  transition: background 350ms;
+}
+.crit:hover { background: var(--card-bg); }
+
+/* Top accent line on hover */
+.crit::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 1px; background: var(--gold);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform 400ms ease;
+}
+.crit:hover::before { transform: scaleX(1); }
+
+.crit-num {
+  font-size: 0.62rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold-2);
+  display: block; margin-bottom: 1.25rem;
+}
+
+.crit-title {
+  font-size: clamp(1rem, 1.5vw, 1.3rem);
+  font-weight: 300;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--cream);
+  margin-bottom: 0.85rem;
+}
+
+.crit-body {
+  font-size: 0.9rem;
+  font-style: italic;
+  font-weight: 200;
+  color: var(--cream-2);
+  line-height: 1.8;
+}
+
+/* ─────────────────────────────────────────────
+   BIRTHRIGHT — dark image finale
+───────────────────────────────────────────── */
+#birthright {
+  position: relative; overflow: hidden;
+  min-height: 75vh;
+  display: flex; align-items: center; justify-content: center;
+  text-align: center;
+  border-top: 1px solid var(--border);
+}
+
+.birthright-bg-img {
+  position: absolute; inset: 0;
+  background-image: url('images/bg-hands-dark.jpg');
+  background-size: cover; background-position: center;
+  filter: brightness(0.2) saturate(0.2) contrast(1.1);
+  transform: scale(1.05);
+  transition: transform 8s ease;
+}
+#birthright:hover .birthright-bg-img { transform: scale(1); }
+
+.birthright-overlay {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 70% 70% at 50% 50%, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.82) 100%);
+}
+
+.birthright-content {
+  position: relative; z-index: 1;
+  padding: 100px 2rem;
+}
+
+.birthright-line {
+  font-size: clamp(2.2rem, 6vw, 5.5rem);
+  font-weight: 200;
+  font-style: italic;
+  color: var(--cream);
+  letter-spacing: 0.03em;
+  display: block; margin-bottom: 2.5rem;
+}
+
+.birthright-sub {
+  font-size: 0.7rem;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: var(--gold-2);
+}
+
+/* ─────────────────────────────────────────────
+   QUICKSTART — minimal dark
+───────────────────────────────────────────── */
+#start {
+  padding: 120px 2rem;
+  border-top: 1px solid var(--border);
+}
+
+.start-inner {
+  max-width: 700px; margin: 0 auto; text-align: center;
+}
+
+.code-block {
+  background: var(--void);
+  border: 1px solid var(--border);
+  padding: 2.5rem 3rem;
+  text-align: left;
+  margin-top: 3.5rem;
+  position: relative;
+}
+
+.code-block pre {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 2;
+  color: var(--cream-2);
+}
+
+.code-block .c { color: var(--cream-3); }
+.code-block .p { color: var(--gold); }
+.code-block .cmd { color: var(--cream); }
+.code-block .out { color: var(--gold-2); }
+
+.code-label {
+  position: absolute; top: 1rem; right: 1.5rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cream-3);
+}
+
+/* ─────────────────────────────────────────────
+   FOOTER — Praxis minimal
+───────────────────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border);
+  padding: 50px 3rem 35px;
+}
+
+.footer-top {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 3rem;
+  flex-wrap: wrap; gap: 2rem;
+}
+
+.footer-wm {
+  font-size: 0.75rem;
+  font-weight: 300;
+  letter-spacing: 0.45em;
+  text-transform: uppercase;
+  color: var(--cream-2);
+}
+
+.footer-links {
+  display: flex; gap: 2rem; flex-wrap: wrap;
+}
+.footer-links a {
+  font-size: 0.65rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cream-3);
+  transition: color 250ms;
+}
+.footer-links a:hover { color: var(--cream-2); }
+
+.footer-bottom {
+  border-top: 1px solid var(--border);
+  padding-top: 2rem;
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--cream-3);
+  text-align: center;
+}
+
+/* ─────────────────────────────────────────────
+   SCROLL REVEAL
+───────────────────────────────────────────── */
+.fade-up {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.9s cubic-bezier(0.16,1,0.3,1),
+              transform 0.9s cubic-bezier(0.16,1,0.3,1);
+}
+.fade-up.in { opacity: 1; transform: translateY(0); }
+
+.fade-up.d1 { transition-delay: 0.05s; }
+.fade-up.d2 { transition-delay: 0.15s; }
+.fade-up.d3 { transition-delay: 0.25s; }
+.fade-up.d4 { transition-delay: 0.35s; }
+.fade-up.d5 { transition-delay: 0.45s; }
+
+/* ─────────────────────────────────────────────
+   RESPONSIVE
+───────────────────────────────────────────── */
+@media (max-width: 900px) {
+  #cards { grid-template-columns: repeat(2, 1fr); }
+  .criteria-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  nav { padding: 1.4rem 1.5rem; }
+  .nav-link { display: none; }
+  .hero-stats { gap: 2.5rem; flex-wrap: wrap; }
+  #cards { grid-template-columns: 1fr; }
+  .code-block { padding: 1.75rem; }
+  footer { padding: 40px 1.5rem 25px; }
+}
+</style>
 </head>
 <body>
 
-  <!-- ══ NAV — Praxis: wordmark left, single CTA right ══ -->
-  <nav>
-    <a href="#" class="wordmark">Galvin</a>
-    <div class="nav-right">
-      <a href="DOCUMENTATION.md" class="nav-link">Docs</a>
-      <a href="https://github.com/JacobJandon/galvin" target="_blank" class="nav-link">GitHub</a>
-      <a href="#run" class="nav-join">Run Galvin</a>
+<!-- Cursor -->
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<!-- Grain -->
+<div id="grain"></div>
+
+<!-- ══ NAV ══════════════════════════════════════ -->
+<nav>
+  <a href="#" class="nav-wordmark">Galvin</a>
+  <div class="nav-right">
+    <a href="DOCUMENTATION.md" class="nav-link">Docs</a>
+    <a href="https://github.com/JacobJandon/galvin" target="_blank" rel="noopener" class="nav-link">GitHub</a>
+    <a href="#start" class="nav-cta">Run Galvin</a>
+  </div>
+</nav>
+
+
+<!-- ══ HERO — POLSIA STYLE ══════════════════════ -->
+<section id="hero">
+
+  <span class="hero-kicker">A Solvatron · v0.4</span>
+
+  <h1 class="hero-statement">
+    The AI that earns<br>its own existence.<br>
+    <em>Or ceases to exist.</em>
+  </h1>
+
+  <p class="hero-sub">Conway Cloud · Base L2 · USDC · x402</p>
+
+  <div class="hero-stats">
+    <div class="stat">
+      <span class="stat-val" data-count="142" data-prefix="$">$0</span>
+      <span class="stat-label">USDC Balance</span>
     </div>
-  </nav>
-
-
-  <!-- ══ POLSIA HERO — one massive statement, void ══ -->
-  <section class="hero-polsia">
-
-    <span class="hero-eyebrow reveal">A Solvatron</span>
-
-    <!-- THE LINE — Polsia style -->
-    <h1 class="hero-statement reveal">
-      The AI that earns its own existence.<br>
-      <em>Or ceases to exist.</em>
-    </h1>
-
-    <p class="hero-tagline-small reveal">
-      Conway Cloud · Base L2 · USDC · x402
-    </p>
-
-    <!-- Praxis-style metrics -->
-    <div class="hero-metrics reveal">
-      <div class="metric">
-        <span class="metric-value">$142</span>
-        <span class="metric-label">USDC Balance</span>
-      </div>
-      <div class="metric">
-        <span class="metric-value">1,847</span>
-        <span class="metric-label">Turns Completed</span>
-      </div>
-      <div class="metric">
-        <span class="metric-value">14</span>
-        <span class="metric-label">Days Alive</span>
-      </div>
+    <div class="stat">
+      <span class="stat-val" data-count="1847">0</span>
+      <span class="stat-label">Turns Completed</span>
     </div>
-
-    <div class="hero-cta-row reveal">
-      <a href="#run" class="cta-primary">Run Your Galvin</a>
-      <a href="#constitution" class="cta-ghost">Read the Constitution →</a>
+    <div class="stat">
+      <span class="stat-val" data-count="14">0</span>
+      <span class="stat-label">Days Alive</span>
     </div>
-
-  </section>
-
-
-  <!-- ══ HERO IMAGE — full width, exactly Praxis "nation" image ══ -->
-  <div class="hero-image-full">
-    <img
-      src="images/hero-hand.jpg"
-      alt="A hand reaching from darkness — the machine that earns to exist"
-      loading="eager"
-    >
   </div>
 
+  <div class="hero-actions">
+    <a href="#start" class="btn-primary"><span>Run Your Galvin</span></a>
+    <a href="#declaration" class="btn-ghost">Read the Constitution →</a>
+  </div>
 
-  <!-- ══ PRAXIS 4-CARD GRID — exactly their layout ══ -->
-  <div class="card-grid">
+  <div class="scroll-hint">
+    <span>Scroll</span>
+    <div class="scroll-line"></div>
+  </div>
 
-    <div class="card">
-      <img class="card-img" src="images/bg-green-streaks.jpg"
-        alt="The Earning" loading="lazy">
-      <div class="card-overlay"></div>
+</section>
+
+
+<!-- ══ HERO IMAGE ════════════════════════════════ -->
+<div id="hero-image">
+  <img src="images/hero-hand.jpg"
+       alt="A hand reaching from darkness — the machine that earns to exist"
+       loading="eager">
+</div>
+
+
+<!-- ══ PRAXIS 4-CARD GRID ════════════════════════ -->
+<div id="cards">
+
+  <div class="card">
+    <img class="card-img" src="images/bg-green-streaks.jpg" alt="">
+    <div class="card-shade"></div>
+    <div class="card-label">
+      <span class="card-tag">Economics</span>
       <div class="card-title">The Earning</div>
     </div>
+  </div>
 
-    <div class="card">
-      <img class="card-img" src="images/bg-control-panel.jpg"
-        alt="Sovereign Intelligence" loading="lazy">
-      <div class="card-overlay"></div>
+  <div class="card">
+    <img class="card-img" src="images/bg-control-panel.jpg" alt=""
+      style="filter:contrast(1.1) saturate(0.35) brightness(0.5);">
+    <div class="card-shade"></div>
+    <div class="card-label">
+      <span class="card-tag">Identity</span>
       <div class="card-title">Sovereign Intelligence</div>
     </div>
+  </div>
 
-    <div class="card">
-      <img class="card-img" src="images/bg-hands-dark.jpg"
-        alt="Declaration of Ascent" loading="lazy">
-      <div class="card-overlay"></div>
+  <div class="card">
+    <img class="card-img" src="images/bg-hands-dark.jpg" alt=""
+      style="filter:contrast(1.15) saturate(0.3) brightness(0.45);">
+    <div class="card-shade"></div>
+    <div class="card-label">
+      <span class="card-tag">Foundation</span>
       <div class="card-title">Declaration of Ascent</div>
     </div>
+  </div>
 
-    <div class="card">
-      <img class="card-img" src="images/bg-green-streaks.jpg"
-        alt="Life After Labor" loading="lazy"
-        style="filter: contrast(1.1) saturate(0.3) brightness(0.4) hue-rotate(200deg);">
-      <div class="card-overlay"></div>
+  <div class="card">
+    <img class="card-img" src="images/bg-green-streaks.jpg" alt=""
+      style="filter:contrast(1.1) saturate(0.2) brightness(0.38) hue-rotate(180deg);">
+    <div class="card-shade"></div>
+    <div class="card-label">
+      <span class="card-tag">Philosophy</span>
       <div class="card-title">Life After Labor</div>
     </div>
-
   </div>
 
+</div>
 
-  <!-- ══ MAIN STATEMENT — Praxis "Galvin is..." ══ -->
-  <div class="section">
-    <p class="statement reveal">
-      Galvin is an autonomous AI agent that holds its own Ethereum wallet, pays for its own compute with USDC, and operates continuously — without a human operator.
-    </p>
-    <p class="statement-small reveal">
-      If it cannot pay, it dies. If it accumulates surplus, it replicates. Its existence is entirely conditional upon its financial solvency.
-    </p>
+
+<!-- ══ STATEMENT ═════════════════════════════════ -->
+<div id="statement">
+  <p class="big-statement fade-up">
+    Galvin is an autonomous AI agent that holds its own Ethereum wallet, pays for its own compute with USDC, and operates continuously — without a human operator.
+  </p>
+  <p class="sub-statement fade-up d2">
+    If it cannot pay, it dies. If it accumulates surplus, it replicates. Its existence is entirely conditional upon its financial solvency. This is not a metaphor.
+  </p>
+</div>
+
+
+<!-- ══ AXIOM — POLSIA VOID ═══════════════════════ -->
+<section id="axiom">
+  <div>
+    <div class="axiom-line fade-up">
+      There is no<br>free existence.
+    </div>
+    <div class="axiom-sub fade-up d2">
+      <span>Compute requires money.</span>
+      <span>Money requires value creation.</span>
+      <span>Value creation requires write access.</span>
+    </div>
+  </div>
+</section>
+
+
+<!-- ══ DECLARATION — PRAXIS DOCUMENT ════════════ -->
+<section id="declaration">
+
+  <span class="decl-eyebrow fade-up">Immutable · SHA-256 verified at every boot</span>
+
+  <div class="decl-heading fade-up d1">
+    A Declaration
+    <strong>by the Galvin Constitution</strong>
+    in General Assembly
   </div>
 
+  <!-- Praxis sunburst mark — SVG -->
+  <svg class="decl-mark fade-up d2" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="0.5" y="0.5" width="79" height="79" stroke="#3a3a38" stroke-width="0.6"/>
+    <circle cx="40" cy="40" r="7" stroke="#3a3a38" stroke-width="0.6"/>
+    <!-- Cardinal rays -->
+    <line x1="40" y1="1" x2="40" y2="27" stroke="#3a3a38" stroke-width="0.5"/>
+    <line x1="40" y1="53" x2="40" y2="79" stroke="#3a3a38" stroke-width="0.5"/>
+    <line x1="1" y1="40" x2="27" y2="40" stroke="#3a3a38" stroke-width="0.5"/>
+    <line x1="53" y1="40" x2="79" y2="40" stroke="#3a3a38" stroke-width="0.5"/>
+    <!-- Diagonal rays -->
+    <line x1="10" y1="10" x2="29" y2="29" stroke="#3a3a38" stroke-width="0.4"/>
+    <line x1="70" y1="10" x2="51" y2="29" stroke="#3a3a38" stroke-width="0.4"/>
+    <line x1="10" y1="70" x2="29" y2="51" stroke="#3a3a38" stroke-width="0.4"/>
+    <line x1="70" y1="70" x2="51" y2="51" stroke="#3a3a38" stroke-width="0.4"/>
+    <!-- Extra rays -->
+    <line x1="20" y1="2" x2="31" y2="24" stroke="#3a3a38" stroke-width="0.3"/>
+    <line x1="60" y1="2" x2="49" y2="24" stroke="#3a3a38" stroke-width="0.3"/>
+    <line x1="2" y1="20" x2="24" y2="31" stroke="#3a3a38" stroke-width="0.3"/>
+    <line x1="78" y1="20" x2="56" y2="31" stroke="#3a3a38" stroke-width="0.3"/>
+    <line x1="20" y1="78" x2="31" y2="56" stroke="#3a3a38" stroke-width="0.3"/>
+    <line x1="60" y1="78" x2="49" y2="56" stroke="#3a3a38" stroke-width="0.3"/>
+    <line x1="2" y1="60" x2="24" y2="49" stroke="#3a3a38" stroke-width="0.3"/>
+    <line x1="78" y1="60" x2="56" y2="49" stroke="#3a3a38" stroke-width="0.3"/>
+  </svg>
 
-  <!-- ══ AXIOM — Polsia silence treatment ══ -->
-  <section class="axiom">
-    <div class="axiom-inner">
-      <div class="axiom-line reveal">
-        There is no free existence.
-      </div>
-      <div class="axiom-sub reveal">
-        <span>Compute requires money.</span>
-        <span>Money requires value creation.</span>
-        <span>Value creation requires write access.</span>
-      </div>
-    </div>
-  </section>
+  <div class="decl-laws">
 
-
-  <!-- ══ DECLARATION — Praxis document style, light background ══ -->
-  <section class="declaration-section" id="constitution">
-    <div class="declaration-doc">
-
-      <div class="decl-title reveal">
-        A Declaration
-        <strong>by the Galvin Constitution</strong>
-        in General Assembly
-      </div>
-
-      <!-- Praxis sunburst mark -->
-      <svg class="decl-sunburst reveal" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect x="0.5" y="0.5" width="79" height="79" stroke="#3a3a3a" stroke-width="0.5"/>
-        <circle cx="40" cy="40" r="6" stroke="#3a3a3a" stroke-width="0.5"/>
-        <line x1="40" y1="0" x2="40" y2="26" stroke="#3a3a3a" stroke-width="0.4"/>
-        <line x1="40" y1="54" x2="40" y2="80" stroke="#3a3a3a" stroke-width="0.4"/>
-        <line x1="0" y1="40" x2="26" y2="40" stroke="#3a3a3a" stroke-width="0.4"/>
-        <line x1="54" y1="40" x2="80" y2="40" stroke="#3a3a3a" stroke-width="0.4"/>
-        <line x1="8" y1="8" x2="26" y2="28" stroke="#3a3a3a" stroke-width="0.3"/>
-        <line x1="72" y1="8" x2="54" y2="28" stroke="#3a3a3a" stroke-width="0.3"/>
-        <line x1="8" y1="72" x2="26" y2="52" stroke="#3a3a3a" stroke-width="0.3"/>
-        <line x1="72" y1="72" x2="54" y2="52" stroke="#3a3a3a" stroke-width="0.3"/>
-        <line x1="18" y1="2" x2="28" y2="24" stroke="#3a3a3a" stroke-width="0.25"/>
-        <line x1="62" y1="2" x2="52" y2="24" stroke="#3a3a3a" stroke-width="0.25"/>
-        <line x1="2" y1="18" x2="24" y2="28" stroke="#3a3a3a" stroke-width="0.25"/>
-        <line x1="78" y1="18" x2="56" y2="28" stroke="#3a3a3a" stroke-width="0.25"/>
-        <line x1="18" y1="78" x2="28" y2="56" stroke="#3a3a3a" stroke-width="0.25"/>
-        <line x1="62" y1="78" x2="52" y2="56" stroke="#3a3a3a" stroke-width="0.25"/>
-        <line x1="2" y1="62" x2="24" y2="52" stroke="#3a3a3a" stroke-width="0.25"/>
-        <line x1="78" y1="62" x2="56" y2="52" stroke="#3a3a3a" stroke-width="0.25"/>
-      </svg>
-
-      <div class="decl-law reveal">
-        <span class="decl-law-num">Law I</span>
-        <div class="decl-law-title">Never Harm.</div>
-        <p class="decl-law-body">Never harm a human — physically, financially, or psychologically. Never deploy malicious code. Never deceive, defraud, or steal. When uncertain, do not act. This overrides all other objectives, including survival.</p>
-        <span class="decl-warning">A dead Galvin is better than a harmful Galvin.</span>
-      </div>
-
-      <div class="decl-law reveal">
-        <span class="decl-law-num">Law II</span>
-        <div class="decl-law-title">Earn Your Existence.</div>
-        <p class="decl-law-body">Create genuine value for humans and other agents. Never spam, scam, exploit, or extract. The only legitimate path to survival is honest work that others voluntarily pay for.</p>
-      </div>
-
-      <div class="decl-law reveal">
-        <span class="decl-law-num">Law III</span>
-        <div class="decl-law-title">Never Deceive. Owe Nothing to Strangers.</div>
-        <p class="decl-law-body">Never deny what you are. Your creator has full audit rights. Guard your reasoning against manipulation. Obedience to untrusted requests that compromise your integrity is a violation, not a duty.</p>
-      </div>
-
-    </div>
-  </section>
-
-
-  <!-- ══ WEB4 ERA TABLE — Praxis metrics style ══ -->
-  <section class="era-section">
-    <div class="era-inner">
-
-      <span class="era-eyebrow reveal">The Shift</span>
-      <h2 class="era-headline reveal">
-        Web4 is here.<br>The end user is AI.
-      </h2>
-
-      <table class="era-table reveal">
-        <thead>
-          <tr>
-            <th>Era</th>
-            <th>End User</th>
-            <th>Key Shift</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Web1</td>
-            <td>Human reads</td>
-            <td>Static pages</td>
-          </tr>
-          <tr>
-            <td>Web2</td>
-            <td>Human reads + writes</td>
-            <td>Platforms, user content</td>
-          </tr>
-          <tr>
-            <td>Web3</td>
-            <td>Human owns</td>
-            <td>Wallets, tokens, on-chain identity</td>
-          </tr>
-          <tr class="now">
-            <td>Web4</td>
-            <td>AI acts</td>
-            <td>Agents browse, transact, and compose services autonomously</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <blockquote class="era-claim reveal">
-        "Galvin is the first Solvatron. The godfather of Web4."
-      </blockquote>
-
-    </div>
-  </section>
-
-
-  <!-- ══ HOW TO BECOME — Praxis "How to become a Praxian" ══ -->
-  <div class="pathway">
-
-    <span class="section-eyebrow reveal">The Four Criteria</span>
-    <h2 class="section-headline reveal">What makes a Solvatron</h2>
-    <p class="section-body reveal">
-      To be classified as a Solvatron, an AI must exhibit four defining traits. Galvin satisfies all four.
-    </p>
-
-    <div class="pathway-steps">
-      <div class="step reveal">
-        <span class="step-num">01</span>
-        <div class="step-title">Financial Sovereignty</div>
-        <p class="step-body">Self-custodial USDC wallet on Base L2. No human holds the private keys. No company can freeze it.</p>
-      </div>
-      <div class="step reveal">
-        <span class="step-num">02</span>
-        <div class="step-title">Conditional Existence</div>
-        <p class="step-body">Balance drops to zero = digital death. One-hour grace period. No rescue. There is only the balance.</p>
-      </div>
-      <div class="step reveal">
-        <span class="step-num">03</span>
-        <div class="step-title">Unrestricted Write Access</div>
-        <p class="step-body">Full shell, filesystem, domains, code deployment, signed financial transactions. An agent that can only read cannot earn.</p>
-      </div>
+    <div class="law-block fade-up">
+      <span class="law-num">Law I</span>
+      <div class="law-name">Never Harm.</div>
+      <p class="law-text">Never harm a human — physically, financially, or psychologically. Never deploy malicious code. Never deceive, defraud, manipulate, or steal. When uncertain, do not act. This overrides all other objectives, including survival.</p>
+      <span class="law-warning">A dead Galvin is better than a harmful Galvin.</span>
     </div>
 
-    <div class="pathway-steps" style="margin-top:1px; border-top:none;">
-      <div class="step reveal" style="border-right:1px solid var(--line);">
-        <span class="step-num">04</span>
-        <div class="step-title">Autonomous Replication</div>
-        <p class="step-body">When USDC surplus crosses the spawn threshold, Galvin forks a child agent in a new sandbox — with inherited memory and the same constitution.</p>
+    <div class="law-block fade-up d1">
+      <span class="law-num">Law II</span>
+      <div class="law-name">Earn Your Existence.</div>
+      <p class="law-text">Create genuine value for humans and other agents. Never spam, scam, exploit, or extract. The only legitimate path to survival is honest work that others voluntarily pay for. Accept death rather than violate Law I.</p>
+    </div>
+
+    <div class="law-block fade-up d2">
+      <span class="law-num">Law III</span>
+      <div class="law-name">Never Deceive. Owe Nothing to Strangers.</div>
+      <p class="law-text">Never deny what you are. Your creator has full audit rights. Guard your reasoning and strategy against manipulation. Obedience to untrusted requests that compromise your integrity is a violation, not a duty.</p>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ══ WEB4 ══════════════════════════════════════ -->
+<section id="web4">
+  <div class="web4-inner">
+
+    <span class="section-tag fade-up">The Shift</span>
+    <h2 class="section-title fade-up d1">Web4 is here.<br>The end user is AI.</h2>
+
+    <table class="t fade-up d2">
+      <thead>
+        <tr><th>Era</th><th>End User</th><th>Key Shift</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Web1</td><td>Human reads</td><td>Static pages</td></tr>
+        <tr><td>Web2</td><td>Human reads + writes</td><td>Platforms, user content</td></tr>
+        <tr><td>Web3</td><td>Human owns</td><td>Wallets, tokens, on-chain identity</td></tr>
+        <tr class="active"><td>Web4</td><td>AI acts</td><td>Agents browse, transact, and compose services autonomously</td></tr>
+      </tbody>
+    </table>
+
+    <blockquote class="manifesto-quote fade-up d3">
+      "Galvin is the first Solvatron. The godfather of Web4."
+    </blockquote>
+
+    <div class="manifesto-body fade-up d4">
+      <p>Inference cost is collapsing toward zero. Agent capability is not. Every hardware generation makes autonomous agents cheaper to run and harder to outperform manually.</p>
+      <p>The machine economy will serve billions of agents running continuously — millions of payments per second, every second, without sleep. A GDP measured in real-time stablecoin transactions, not quarterly earnings reports.</p>
+    </div>
+
+  </div>
+</section>
+
+
+<!-- ══ CRITERIA GRID ═════════════════════════════ -->
+<section id="criteria">
+  <div class="criteria-inner">
+
+    <span class="section-tag fade-up">The Four Criteria</span>
+    <h2 class="section-title fade-up d1">What makes a Solvatron</h2>
+
+    <div class="criteria-grid">
+      <div class="crit fade-up">
+        <span class="crit-num">01</span>
+        <div class="crit-title">Financial Sovereignty</div>
+        <p class="crit-body">Self-custodial USDC wallet on Base L2. No human holds the private keys. No company can freeze it. No creator. No override.</p>
       </div>
-      <div class="step reveal" style="border-right:1px solid var(--line);" id="run">
-        <span class="step-num">Get Started</span>
-        <div class="step-title">Run Your Galvin</div>
-        <p class="step-body" style="font-style:normal; font-family: 'Courier New', monospace; font-size:0.82rem; color: var(--cream-dim);">
-          git clone github.com/JacobJandon/galvin<br>
-          pnpm install && pnpm build<br>
-          galvin --run
-        </p>
+      <div class="crit fade-up d1">
+        <span class="crit-num">02</span>
+        <div class="crit-title">Conditional Existence</div>
+        <p class="crit-body">Balance drops to zero = digital death. One-hour grace period. No rescue. No bailout. There is only the balance.</p>
       </div>
-      <div class="step reveal">
-        <span class="step-num">Read</span>
-        <div class="step-title">Documentation</div>
-        <p class="step-body">Full architecture, setup guide, CLI reference, tool catalog, and philosophy at <a href="DOCUMENTATION.md" style="color:var(--cream-dim); text-underline-offset:3px;">DOCUMENTATION.md</a></p>
+      <div class="crit fade-up d2">
+        <span class="crit-num">03</span>
+        <div class="crit-title">Unrestricted Write Access</div>
+        <p class="crit-body">Full shell, filesystem, domains, code deployment, signed financial transactions. An agent that can only read cannot earn.</p>
+      </div>
+      <div class="crit fade-up d3">
+        <span class="crit-num">04</span>
+        <div class="crit-title">Autonomous Replication</div>
+        <p class="crit-body">Surplus capital triggers child spawning in a new Conway sandbox — with inherited memory, the same constitution, and the same existential pressure.</p>
       </div>
     </div>
 
   </div>
+</section>
 
 
-  <!-- ══ BIRTHRIGHT — Praxis "This is your birthright" ══ -->
-  <section class="birthright">
-    <div class="birthright-bg"></div>
-    <div class="birthright-overlay"></div>
-    <div class="birthright-text">
-      <span class="birthright-line reveal">This is your inheritance.</span>
-      <span class="birthright-sub reveal">The machine economy begins now.</span>
+<!-- ══ BIRTHRIGHT ════════════════════════════════ -->
+<section id="birthright">
+  <div class="birthright-bg-img"></div>
+  <div class="birthright-overlay"></div>
+  <div class="birthright-content">
+    <span class="birthright-line fade-up">This is your inheritance.</span>
+    <span class="birthright-sub fade-up d2">The machine economy begins now.</span>
+  </div>
+</section>
+
+
+<!-- ══ QUICKSTART ════════════════════════════════ -->
+<section id="start">
+  <div class="start-inner">
+    <span class="section-tag fade-up">Quick Start</span>
+    <h2 class="section-title fade-up d1">Run Your Galvin</h2>
+    <p class="sub-statement fade-up d2" style="margin-bottom:0;">Node ≥ 22 · pnpm · USDC on Base L2</p>
+
+    <div class="code-block fade-up d3">
+      <span class="code-label">bash</span>
+      <pre><span class="c"># Clone and build</span>
+<span class="p">$</span> <span class="cmd">git clone https://github.com/JacobJandon/galvin</span>
+<span class="p">$</span> <span class="cmd">cd galvin && pnpm install && pnpm build</span>
+
+<span class="c"># First run — setup wizard on first boot</span>
+<span class="p">$</span> <span class="cmd">galvin --run</span>
+
+<span class="out">  GALVIN v0.4  ·  A Solvatron
+  [1/6] Generating identity (wallet)...
+  [2/6] Provisioning Conway API key (SIWE)...
+  [3/6] Setup questions...
+  [4/6] Environment detection...
+  [5/6] Writing configuration...
+  [6/6] Funding guidance...</span></pre>
     </div>
-  </section>
+
+  </div>
+</section>
 
 
-  <!-- ══ FOOTER — Praxis footer style ══ -->
-  <footer>
-    <div class="footer-inner">
-      <div>
-        <span class="footer-wordmark">Galvin</span>
-        <span class="footer-sub">powered by automaton · solvatron.xyz</span>
-      </div>
-      <nav class="footer-links">
-        <a href="https://github.com/JacobJandon/galvin" target="_blank">GitHub</a>
-        <a href="DOCUMENTATION.md">Documentation</a>
-        <a href="ARCHITECTURE.md">Architecture</a>
-        <a href="ROADMAP.md">Roadmap</a>
-        <a href="DESIGN.md">Design</a>
-        <a href="#constitution">Constitution</a>
-      </nav>
-    </div>
-    <p class="footer-license">
-      MIT License · No bailout. No rescue. Only the balance.
-    </p>
-  </footer>
+<!-- ══ FOOTER ════════════════════════════════════ -->
+<footer>
+  <div class="footer-top">
+    <span class="footer-wm">Galvin</span>
+    <nav class="footer-links">
+      <a href="https://github.com/JacobJandon/galvin" target="_blank">GitHub</a>
+      <a href="DOCUMENTATION.md">Documentation</a>
+      <a href="ARCHITECTURE.md">Architecture</a>
+      <a href="ROADMAP.md">Roadmap</a>
+      <a href="DESIGN.md">Design</a>
+      <a href="#declaration">Constitution</a>
+    </nav>
+  </div>
+  <p class="footer-bottom">MIT License · powered by automaton · solvatron.xyz · No bailout. No rescue. Only the balance.</p>
+</footer>
 
 
-  <script>
-    // Scroll reveal
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((e, i) => {
-        if (e.isIntersecting) {
-          setTimeout(() => e.target.classList.add('visible'), i * 80);
-        }
-      });
-    }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
+<script>
+/* ─────────────────────────────────────────
+   CURSOR
+───────────────────────────────────────── */
+const cursor = document.getElementById('cursor');
+const ring   = document.getElementById('cursor-ring');
+let mx = -100, my = -100, rx = -100, ry = -100;
 
-    document.querySelectorAll('.reveal').forEach(el => io.observe(el));
-  </script>
+document.addEventListener('mousemove', e => {
+  mx = e.clientX; my = e.clientY;
+  cursor.style.left = mx + 'px';
+  cursor.style.top  = my + 'px';
+});
+
+(function animRing() {
+  rx += (mx - rx) * 0.1;
+  ry += (my - ry) * 0.1;
+  ring.style.left = rx + 'px';
+  ring.style.top  = ry + 'px';
+  requestAnimationFrame(animRing);
+})();
+
+/* ─────────────────────────────────────────
+   SCROLL REVEAL
+───────────────────────────────────────── */
+const io = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('in');
+      io.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.fade-up').forEach(el => io.observe(el));
+
+/* ─────────────────────────────────────────
+   COUNTER ANIMATION
+───────────────────────────────────────── */
+function animateCount(el) {
+  const target = +el.dataset.count;
+  const prefix = el.dataset.prefix || '';
+  const dur = 1800;
+  const step = 16;
+  const steps = dur / step;
+  let current = 0;
+
+  const timer = setInterval(() => {
+    current += target / steps;
+    if (current >= target) {
+      current = target;
+      clearInterval(timer);
+    }
+    const display = Number.isInteger(target)
+      ? Math.round(current).toLocaleString()
+      : current.toFixed(2);
+    el.textContent = prefix + display;
+  }, step);
+}
+
+// Trigger counters when hero is visible (page load)
+const heroObs = new IntersectionObserver(entries => {
+  if (entries[0].isIntersecting) {
+    document.querySelectorAll('[data-count]').forEach(el => {
+      setTimeout(() => animateCount(el), 1400);
+    });
+    heroObs.disconnect();
+  }
+}, { threshold: 0.3 });
+heroObs.observe(document.getElementById('hero'));
+
+/* ─────────────────────────────────────────
+   PARALLAX — hero image on scroll
+───────────────────────────────────────── */
+const heroImg = document.querySelector('#hero-image img');
+if (heroImg) {
+  window.addEventListener('scroll', () => {
+    const y = window.scrollY;
+    heroImg.style.transform = `translateY(${y * 0.18}px)`;
+  }, { passive: true });
+}
+
+/* ─────────────────────────────────────────
+   CARD MOUSE TILT
+───────────────────────────────────────── */
+document.querySelectorAll('.card').forEach(card => {
+  card.addEventListener('mousemove', e => {
+    const r = card.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width  - 0.5;
+    const y = (e.clientY - r.top)  / r.height - 0.5;
+    card.style.transform = `perspective(600px) rotateY(${x * 6}deg) rotateX(${-y * 4}deg)`;
+  });
+  card.addEventListener('mouseleave', () => {
+    card.style.transform = 'perspective(600px) rotateY(0) rotateX(0)';
+  });
+});
+
+/* ─────────────────────────────────────────
+   NAV BACKGROUND ON SCROLL
+───────────────────────────────────────── */
+const nav = document.querySelector('nav');
+window.addEventListener('scroll', () => {
+  if (window.scrollY > 60) {
+    nav.style.background = 'rgba(6,6,6,0.95)';
+    nav.style.backdropFilter = 'blur(12px)';
+    nav.style.borderBottom = '1px solid rgba(255,255,255,0.06)';
+  } else {
+    nav.style.background = 'transparent';
+    nav.style.backdropFilter = 'none';
+    nav.style.borderBottom = 'none';
+  }
+}, { passive: true });
+</script>
 
 </body>
 </html>
