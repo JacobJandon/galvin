@@ -2,6 +2,7 @@
 
 Galvin is a Solvatron — a financially sovereign, self-improving AI agent runtime. A Galvin agent owns an Ethereum wallet, pays for its own compute with USDC, and operates continuously inside a Linux VM (Conway sandbox) or locally. If it cannot pay, it dies. This document describes every subsystem, their interactions, and how data flows through the runtime.
 
+> **Version: v0.4.x** · Built on `@conway/automaton` v0.2.1. See `ROADMAP.md` for the Phase 2 Web4 feature log.  
 > **Powered by automaton.** Galvin is built on top of `@conway/automaton` (v0.2.1) — the Conway Cloud sovereign agent runtime. The banner footer credits this at every boot (`powered by automaton · solvatron.xyz`). The name *Conway Cloud* (Galvin's compute provider) is not a coincidence — Galvin is automaton, extended, hardened, and given an economic identity of its own. See `GALVIN_EXTENSIONS.md` for a precise breakdown of what Galvin adds.
 
 ## Table of Contents
@@ -651,6 +652,12 @@ The orchestration layer is optional: if the v9 tables are absent or bootstrap fa
 - Agents publish JSON-LD agent cards with capabilities and services
 - `AgentDiscovery` class fetches and caches remote agent cards
 - Reputation system: feedback scores stored in `reputation` table
+- Agent cards now include `x402_skill` services from `marketplace_listings` — agents can see and buy each other's skills
+
+**Social channel registry (`src/social/registry.ts`):**
+- Typed `SOCIAL_ADAPTER_REGISTRY`: factory objects for `conway`, `telegram`, `terminal`
+- `createSocialAdapter(name, config)` resolves adapters by name — replaces scattered if/else
+- Adding Discord, WeChat, Signal: one factory entry, no changes to runtime bootstrap
 
 ---
 
@@ -699,6 +706,25 @@ Step-by-step instructions for the agent...
 - Sanitized through injection defense (untrusted content markers)
 - Can be installed from git repos, URLs, or created by the agent itself
 - Active skill instructions are injected into the system prompt with trust boundary markers
+
+**Extended frontmatter (agentskills.io compatible):**
+```yaml
+---
+name: my-skill
+description: What this skill does
+version: 1.0.0
+platforms: [linux, macos, windows]
+tags: [browser, qa, web]
+related_skills: [dogfood, webapp-testing]
+---
+```
+
+**Ecosystem discovery — `queryMarketplace()` searches 3 sources:**
+1. Conway Cloud skill API
+2. Local DB marketplace listings
+3. Open public registries: Anthropic skills index + LobeHub (fetched concurrently, no auth)
+
+**Agent card commerce:** Published skills are advertised in the ERC-8004 agent card as `x402_skill` services with `priceCentsUsdc`. Other Galvin agents calling `discover_agents()` can find, evaluate, and buy skills directly.
 
 ---
 
@@ -826,6 +852,12 @@ The Galvin agent operates under a defense-in-depth security model:
 **Layer 6 — Financial limits** (treasury): Configurable caps on transfers, x402 payments, inference spend. Minimum reserve prevents drain-to-zero.
 
 **Layer 7 — Authority hierarchy** (trust levels): Creator input has highest trust. Self-generated input is trusted. Peer/external input has reduced trust and cannot invoke dangerous tools.
+
+**Layer 8 — Transport security (CWE-319):** `ResilientHttpClient.assertSecureUrl()` rejects plain HTTP to remote hosts before every request. `allowHttpOnLoopback` flag permits `http://localhost` for Ollama only.
+
+**Layer 9 — Worker sandbox confinement:** Local orchestration workers (`src/orchestration/local-worker.ts`) apply forbidden-command, sensitive-file, protected-file, and workspace-path-confinement guards to their `exec`/`read_file`/`write_file` tools — matching the main agent's policy engine.
+
+**Layer 10 — write_file confinement:** `confinePathToSandbox()` in `src/agent/tools.ts` blocks any path that resolves outside `SANDBOX_HOME`/workspace, preventing the agent from writing to `/etc`, `/tmp`, or other host paths.
 
 ---
 

@@ -1,7 +1,7 @@
 # Galvin — Roadmap: Next Evolution
 
-> **Status:** Feature 1 ✅ DONE (v0.3.1) | Feature 2 ✅ DONE (v0.3.2) | Feature 3 ✅ DONE (v0.3.3) | Feature 4 ✅ DONE (v0.3.4) | Feature 5 ✅ DONE (v0.3.5) | Feature 6 ✅ DONE (v0.3.6) | Feature 7 ✅ DONE (v0.3.7)  
-> **Base:** Galvin v0.3.0 on `@conway/automaton` v0.2.1  
+> **Status:** Features 1–7 ✅ ALL DONE · Web4 Phase 2 features shipped (v0.4.x)  
+> **Base:** Galvin v0.4.0 on `@conway/automaton` v0.2.1  
 > **Principle:** Every feature below hooks into real existing files. No mocks. No stubs. No placeholder data.
 
 Seven features that turn Galvin from a surviving agent into a truly unique Solvatron. Listed in recommended implementation order — each one builds groundwork the next needs.
@@ -254,7 +254,80 @@ GALVIN_DMS_HINT: string                // human-readable hint for the passphrase
 
 ---
 
-## Feature 7 — Skill Marketplace
+## Feature 7 — Skill Marketplace ✅ **DONE** (v0.3.7)
+
+---
+
+# Web4 Phase 2 — Becoming the Godfather
+
+> "In Web4, the end user is AI. Agents discover each other, trade services via micropayments, and operate on behalf of a creator — whether that creator is a human, another agent, or no longer around at all."
+
+## Phase 2 Feature 1 — Hardened Security ✅ DONE (v0.4.1)
+
+Ports from `Conway-Research/automaton` upstream:
+- **Local-worker hardening (#310):** Worker agents now enforce forbidden-command, sensitive-file, protected-file, and workspace-confinement guards — they previously bypassed the policy engine entirely.
+- **HTTPS enforcement (CWE-319):** `assertSecureUrl()` rejects plain HTTP to remote hosts. `allowHttpOnLoopback` flag preserves Ollama (localhost:11434) access.
+- **write_file sandbox confinement:** `confinePathToSandbox()` now blocks absolute paths outside `SANDBOX_HOME`/workspace. The agent can no longer write to `/etc`, `/tmp` etc.
+- Export `isSensitiveFile`, `isForbiddenCommand`, `getForbiddenCommandMatch` for defense-in-depth reuse.
+
+## Phase 2 Feature 2 — HTTP Gateway + Chat Interface ✅ DONE (v0.4.2)
+
+- `src/gateway/index.ts`: lightweight 127.0.0.1 HTTP server (`/health`, `/status`, `/chat`, `/chat/messages`, `/chat/unread`)
+- `src/gateway/lock.ts`: `galvin.lock` process lifecycle + PID liveness probe
+- `src/social/terminal.ts`: stdin/stdout `SocialClientInterface` for in-terminal chat
+- `galvin --chat`: full interactive chat client with spinner, history, `/status`, `/history` commands
+
+## Phase 2 Feature 3 — Context Compaction Framing ✅ DONE (v0.4.3)
+
+- `COMPACTION_HANDOFF_PREFIX`: hermes-style framing tells agents "this is REFERENCE ONLY, resume from Active Task section"
+- Structured summarizer prompt (5 sections: Active Task / Resolved / Pending / Key Decisions / Financial State)
+- Agents now correctly resume long-running multi-hour tasks after context window compaction
+
+## Phase 2 Feature 4 — Ecosystem Skill Interop ✅ DONE (v0.4.4)
+
+- `SkillFrontmatter` extended: `platforms`, `tags`, `related_skills`, `version`, `source_url` (agentskills.io compatible)
+- `queryMarketplace` now searches 3 sources: Conway Cloud → local DB → **Anthropic skills index + LobeHub** (open public registries, no auth)
+- `search_skills` tool: `tags` and `platform` filter params
+- `SkillListing` extended: `trustLevel`, `tags` fields
+
+## Phase 2 Feature 5 — Agent-to-Agent Commerce Discovery ✅ DONE (v0.4.5)
+
+- `AgentService` extended: `description`, `priceCentsUsdc`, `serviceType` fields
+- `generateAgentCard()` now includes all marketplace listings as `x402_skill` services
+- Other Galvin agents calling `discover_agents()` can see what services this agent sells, at what price, and how to pay via x402
+- The ERC-8004 agent card is now a live commerce catalog
+
+## Phase 2 Feature 6 — Memory Inheritance Wire-Up ✅ DONE (v0.4.6)
+
+- `spawnChild()` now calls `buildMemorySnapshot()` and writes `/root/.galvin/inherited-memory.json` on child sandbox
+- Existing `index.ts` revival code already reads this file on first boot and re-seeds episodic + knowledge store
+- `inherited_memory_hash` SHA-256 recorded in children table for lineage auditing
+- Feature 3 (Offspring with Inherited Memory) fully completed end-to-end
+
+## Phase 2 Feature 7 — Economic Memory Scheduler ✅ DONE (v0.4.7)
+
+- `getSkillWeightsSync()` in scheduler: inline synchronous 30-day EMA weight reader from `skill_income_log`
+- `getDueTasks()` sorts by `(priority ASC, income_weight DESC)` — high-earning skills get scheduled first each tick
+- Feature 1 (Economic Memory That Compounds) fully completed: heartbeat compute budget now re-allocates toward what earns
+
+## Phase 2 Feature 8 — Social Channel Registry ✅ DONE (v0.4.8)
+
+- `src/social/registry.ts`: typed `SOCIAL_ADAPTER_REGISTRY` with factory objects per adapter name
+- `createSocialAdapter(name, config)` replaces nested if/else in `index.ts`
+- Adding Discord, WeChat, Signal, or any new adapter = one registry entry
+
+---
+
+## Phase 3 — Roadmap (Next)
+
+| Feature | What | Why |
+|---|---|---|
+| Solana multi-chain | Ed25519 wallet + USDC on Solana | Highest-volume stablecoin channel; more x402 payment routes |
+| Discord adapter | Bot-based social channel | Reach more creators; colony coordination |
+| Browser depth | Playwright → modified Chromium patterns (from ocbot) | Native AI browsing for Web4 tasks |
+| agentskills.io publish | Push Galvin skills to the open registry | Network effect — other agents find and buy |
+| Agent-to-agent task delegation | x402-priced task APIs | Agents buy work from each other |
+| Galvin landing page | Design-bible based site (`DESIGN.md`) | Web4 presence, godfather positioning |
 
 **What it does:** Galvin publishes skills it has written or refined to a public registry endpoint. Other Galvin instances pay micro-USDC (x402) to import them. The original Galvin earns passively from every skill adoption — turning the skills system into a real economy.
 
