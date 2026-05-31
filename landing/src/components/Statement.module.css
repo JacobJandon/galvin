@@ -1,0 +1,33 @@
+.wrap {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 160px 2rem 140px;
+  text-align: center;
+}
+
+.big, .sub {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.9s var(--ease), transform 0.9s var(--ease);
+}
+.sub { transition-delay: 0.18s; }
+.in  { opacity: 1; transform: translateY(0); }
+
+.big {
+  font-size: clamp(1.5rem, 3vw, 2.6rem);
+  font-weight: 200;
+  line-height: 1.6;
+  color: var(--cream);
+  margin-bottom: 2.5rem;
+  letter-spacing: 0.01em;
+}
+
+.sub {
+  font-size: clamp(0.9rem, 1.5vw, 1.15rem);
+  font-style: italic;
+  font-weight: 200;
+  color: var(--cream-2);
+  line-height: 1.9;
+  max-width: 540px;
+  margin: 0 auto;
+}

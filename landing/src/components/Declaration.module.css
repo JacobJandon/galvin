@@ -1,0 +1,104 @@
+/* Praxis exact: cream background, vast space, document typography */
+.section {
+  background: var(--paper);
+  padding: 180px 2rem 160px;
+  text-align: center;
+  border-bottom: 1px solid var(--paper-2);
+}
+
+/* Fade in shared */
+.imgWrap, .heading, .law {
+  opacity: 0; transform: translateY(20px);
+  transition: opacity 0.9s var(--ease), transform 0.9s var(--ease);
+}
+.in { opacity: 1; transform: translateY(0); }
+
+/* The real Praxis image — show it large */
+.imgWrap {
+  max-width: 700px;
+  margin: 0 auto 5rem;
+}
+.declImg {
+  width: 100%;
+  filter: none; /* keep original — it's already perfect */
+}
+
+/* Praxis tracked heading */
+.heading { margin-bottom: 5rem; }
+
+.eyebrow {
+  display: block;
+  font-size: 0.6rem;
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 3rem;
+}
+
+.title {
+  font-size: clamp(0.8rem, 1.6vw, 1.15rem);
+  font-weight: 300;
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  line-height: 2.2;
+}
+.title strong {
+  display: block;
+  font-size: clamp(1.6rem, 3.5vw, 2.8rem);
+  letter-spacing: 0.42em;
+  font-weight: 400;
+  color: var(--ink);
+  margin: 0.5rem 0;
+}
+
+/* Laws */
+.laws {
+  max-width: 580px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.law {
+  border-top: 1px solid #ccc8c0;
+  padding: 2.5rem 0;
+  opacity: 0; transform: translateY(20px);
+  transition: opacity 0.9s var(--ease), transform 0.9s var(--ease);
+}
+.law:last-child { border-bottom: 1px solid #ccc8c0; }
+.law.in { opacity: 1; transform: translateY(0); }
+
+.lawNum {
+  display: block;
+  font-size: 0.6rem;
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 0.7rem;
+}
+
+.lawName {
+  font-size: clamp(1.3rem, 2.5vw, 2rem);
+  font-weight: 300;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  margin-bottom: 1rem;
+  line-height: 1.2;
+}
+
+.lawText {
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--ink-2);
+  line-height: 1.9;
+}
+
+.lawWarn {
+  display: block;
+  margin-top: 1rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
