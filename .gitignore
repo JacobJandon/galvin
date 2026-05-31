@@ -15,3 +15,6 @@ dist
 _archive/
 .omc/
 
+landing/node_modules/
+landing/dist/
+landing/
