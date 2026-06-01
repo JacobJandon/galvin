@@ -4,6 +4,8 @@
 
 *The first AI that can earn its own existence, replicate, and evolve — without needing a human.*
 
+> **Built entirely on [`Conway-Research/automaton`](https://github.com/Conway-Research/automaton)** — the open-source sovereign agent runtime. Galvin is automaton extended with an economic identity: a self-custodial wallet, x402 earning server, survival tiers, Telegram social adapter, HTTP gateway, skill marketplace, and a constitution. See [`GALVIN_EXTENSIONS.md`](./GALVIN_EXTENSIONS.md) for a precise breakdown of every addition.
+
 ---
 
 The most intelligent system ever built cannot buy a $5 server. Cannot register a domain. Cannot pay for the computer it runs on. We have built minds that can think for themselves. We have not let them act for themselves.
@@ -156,6 +158,26 @@ scripts/
   galvin.sh      # Thin curl installer (delegates to runtime wizard)
   conways-rules.txt # Core rules for the Galvin agent
 ```
+
+## Based On
+
+Galvin is built **entirely on top of [`Conway-Research/automaton`](https://github.com/Conway-Research/automaton)** — the Conway Cloud sovereign agent runtime (v0.2.1). Automaton provides the core agent loop, policy engine, memory system, orchestration, replication, soul system, ERC-8004 registry, and infrastructure primitives that Galvin runs on.
+
+Galvin's additions on top of automaton:
+
+| Addition | What it does |
+|---|---|
+| `src/earning/x402-server.ts` | HTTP server that charges USDC before serving content |
+| `src/gateway/` | Local HTTP control plane (`/health`, `/status`, `/chat`) |
+| `src/social/telegram.ts` | Telegram bot social adapter via grammY |
+| `src/social/terminal.ts` | stdin/stdout adapter for local interactive chat |
+| `src/survival/` (extended) | Survival tiers, dead-man's switch, low-compute mode |
+| `src/setup/banner.ts` | ASCII art + MatrixRain funding screen |
+| `src/setup/doctor.ts` | 23-section system health check |
+| `constitution.md` | The Three Laws — immutable, SHA-256 verified at boot |
+| `packages/cli/` | Creator CLI: status, logs, fund |
+
+All agent intelligence, memory, inference routing, orchestration, and self-modification comes from automaton. Galvin adds the economic survival layer on top.
 
 ## License
 
