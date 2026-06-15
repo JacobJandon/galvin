@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+import Database from "../../state/sqlite-compat.js";
 import type BetterSqlite3 from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MIGRATION_V9, MIGRATION_V10 } from "../../state/schema.js";

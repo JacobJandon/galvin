@@ -6,7 +6,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import Database from "better-sqlite3";
+import Database from "../state/sqlite-compat.js";
 import { MIGRATION_V7 } from "../state/schema.js";
 
 // ─── Test helpers ───────────────────────────────────────────────

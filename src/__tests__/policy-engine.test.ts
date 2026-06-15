@@ -40,7 +40,7 @@ import type {
   TreasuryPolicy,
   LimitCheckResult,
 } from "../types.js";
-import Database from "better-sqlite3";
+import Database from "../state/sqlite-compat.js";
 import path from "path";
 import os from "os";
 import fs from "fs";

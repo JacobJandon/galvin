@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import Database from "../../state/sqlite-compat.js";
 import type BetterSqlite3 from "better-sqlite3";
 import { CREATE_TABLES, MIGRATION_V9, MIGRATION_V9_ALTER_CHILDREN_ROLE, MIGRATION_V10 } from "../../state/schema.js";
 

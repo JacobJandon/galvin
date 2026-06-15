@@ -18,7 +18,7 @@ import {
   proceduralUpsert,
 } from "../state/database.js";
 import { createDatabase } from "../state/database.js";
-import Database from "better-sqlite3";
+import Database from "../state/sqlite-compat.js";
 
 let dbPath: string;
 let db: ReturnType<typeof Database>;

@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import Database from "better-sqlite3";
+import Database from "../state/sqlite-compat.js";
 import { ChildLifecycle } from "../replication/lifecycle.js";
 import { ChildHealthMonitor } from "../replication/health.js";
 import { SandboxCleanup } from "../replication/cleanup.js";

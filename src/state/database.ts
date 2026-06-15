@@ -5,7 +5,10 @@
  * Uses better-sqlite3 for synchronous, single-process access.
  */
 
-import Database from "better-sqlite3";
+// Runtime: node:sqlite shim (better-sqlite3's native addon does not build on
+// Node 26 — see ./sqlite-compat.ts). Types: still better-sqlite3's, which the
+// shim satisfies at runtime; the type-only import loads no native binary.
+import Database from "./sqlite-compat.js";
 import type BetterSqlite3 from "better-sqlite3";
 import fs from "fs";
 import path from "path";
@@ -48,6 +51,7 @@ import {
   MIGRATION_V11_ALTER_EPISODIC_COMPACTED,
   MIGRATION_V12,
   MIGRATION_V13,
+  MIGRATION_V14,
 } from "./schema.js";
 import type {
   RiskLevel,
@@ -84,7 +88,9 @@ export function createDatabase(dbPath: string): GalvinDatabase {
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   }
 
-  const db = new Database(dbPath);
+  // Cast the shim instance to the better-sqlite3 type so every downstream
+  // signature (applyMigrations, query helpers, etc.) stays unchanged.
+  const db = new Database(dbPath) as unknown as DatabaseType;
 
   // Enable WAL mode for better concurrent read performance
   db.pragma("journal_mode = WAL");
@@ -633,6 +639,10 @@ function applyMigrations(db: DatabaseType): void {
     {
       version: 13,
       apply: () => db.exec(MIGRATION_V13),
+    },
+    {
+      version: 14,
+      apply: () => db.exec(MIGRATION_V14),
     },
   ];
 
@@ -2580,4 +2590,171 @@ export function getSkillIncomeLogs(
     usdc: r.usdc,
     ts: r.ts,
   }));
+}
+
+// ─── Bounty Candidates (V14) ───────────────────────────────────
+
+export type BountyStatus =
+  | "found"
+  | "queued"
+  | "attempting"
+  | "submitted"
+  | "paid"
+  | "rejected"
+  | "abandoned";
+
+export interface BountyCandidateRow {
+  id: string;
+  url: string;
+  repo: string;
+  issueNumber: number;
+  title: string;
+  amountUsd: number;
+  score: number;
+  scoreReasons: string[];
+  status: BountyStatus;
+  attemptBudgetCents: number;
+  spentCents: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+function mapBountyRow(r: any): BountyCandidateRow {
+  let reasons: string[] = [];
+  try { reasons = JSON.parse(r.score_reasons); } catch { /* keep [] */ }
+  return {
+    id: r.id,
+    url: r.url,
+    repo: r.repo,
+    issueNumber: r.issue_number,
+    title: r.title,
+    amountUsd: r.amount_usd,
+    score: r.score,
+    scoreReasons: reasons,
+    status: r.status,
+    attemptBudgetCents: r.attempt_budget_cents,
+    spentCents: r.spent_cents,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+  };
+}
+
+/**
+ * Insert a bounty candidate or refresh an existing one (keyed by URL).
+ * Score, amount, and title may change between scans; status never regresses
+ * via upsert — lifecycle transitions go through updateBountyCandidateStatus.
+ */
+export function upsertBountyCandidate(
+  db: DatabaseType,
+  c: {
+    url: string;
+    repo: string;
+    issueNumber: number;
+    title: string;
+    amountUsd: number;
+    score: number;
+    scoreReasons: string[];
+    attemptBudgetCents: number;
+  },
+): BountyCandidateRow {
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO bounty_candidates
+       (id, url, repo, issue_number, title, amount_usd, score, score_reasons,
+        status, attempt_budget_cents, spent_cents, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'found', ?, 0, ?, ?)
+     ON CONFLICT(url) DO UPDATE SET
+       title = excluded.title,
+       amount_usd = excluded.amount_usd,
+       score = excluded.score,
+       score_reasons = excluded.score_reasons,
+       attempt_budget_cents = excluded.attempt_budget_cents,
+       updated_at = excluded.updated_at`,
+  ).run(
+    ulid(),
+    c.url,
+    c.repo,
+    c.issueNumber,
+    c.title,
+    c.amountUsd,
+    c.score,
+    JSON.stringify(c.scoreReasons),
+    c.attemptBudgetCents,
+    now,
+    now,
+  );
+  const row = db
+    .prepare("SELECT * FROM bounty_candidates WHERE url = ?")
+    .get(c.url);
+  return mapBountyRow(row);
+}
+
+export function getBountyCandidates(
+  db: DatabaseType,
+  status?: BountyStatus,
+  limit = 50,
+): BountyCandidateRow[] {
+  const rows = status
+    ? db
+        .prepare(
+          "SELECT * FROM bounty_candidates WHERE status = ? ORDER BY score DESC, amount_usd DESC LIMIT ?",
+        )
+        .all(status, limit)
+    : db
+        .prepare(
+          "SELECT * FROM bounty_candidates ORDER BY score DESC, amount_usd DESC LIMIT ?",
+        )
+        .all(limit);
+  return (rows as any[]).map(mapBountyRow);
+}
+
+export function getBountyCandidateByUrl(
+  db: DatabaseType,
+  url: string,
+): BountyCandidateRow | undefined {
+  const row = db
+    .prepare("SELECT * FROM bounty_candidates WHERE url = ?")
+    .get(url);
+  return row ? mapBountyRow(row) : undefined;
+}
+
+export function getBountyCandidateById(
+  db: DatabaseType,
+  id: string,
+): BountyCandidateRow | undefined {
+  const row = db
+    .prepare("SELECT * FROM bounty_candidates WHERE id = ?")
+    .get(id);
+  return row ? mapBountyRow(row) : undefined;
+}
+
+export function updateBountyCandidateStatus(
+  db: DatabaseType,
+  id: string,
+  status: BountyStatus,
+): void {
+  db.prepare(
+    "UPDATE bounty_candidates SET status = ?, updated_at = ? WHERE id = ?",
+  ).run(status, new Date().toISOString(), id);
+}
+
+/**
+ * Record inference spend against a bounty attempt.
+ * Returns the remaining budget in cents (negative means over budget).
+ */
+export function addBountyCandidateSpend(
+  db: DatabaseType,
+  id: string,
+  cents: number,
+): number {
+  db.prepare(
+    "UPDATE bounty_candidates SET spent_cents = spent_cents + ?, updated_at = ? WHERE id = ?",
+  ).run(cents, new Date().toISOString(), id);
+  const row = db
+    .prepare(
+      "SELECT attempt_budget_cents, spent_cents FROM bounty_candidates WHERE id = ?",
+    )
+    .get(id) as { attempt_budget_cents: number; spent_cents: number } | undefined;
+  if (!row) return 0;
+  return row.attempt_budget_cents - row.spent_cents;
 }

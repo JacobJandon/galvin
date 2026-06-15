@@ -1,4 +1,4 @@
-import Database from "better-sqlite3";
+import Database from "../../state/sqlite-compat.js";
 import type BetterSqlite3 from "better-sqlite3";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MIGRATION_V9 } from "../../state/schema.js";

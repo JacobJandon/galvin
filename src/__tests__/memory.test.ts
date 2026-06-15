@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import Database from "better-sqlite3";
+import Database from "../state/sqlite-compat.js";
 import { MIGRATION_V5 } from "../state/schema.js";
 import { WorkingMemoryManager } from "../memory/working.js";
 import { EpisodicMemoryManager } from "../memory/episodic.js";

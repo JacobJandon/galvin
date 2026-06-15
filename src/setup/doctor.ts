@@ -340,8 +340,12 @@ function checkDatabase(checks: Check[], config: ReturnType<typeof loadConfig>): 
   try {
     db = createDatabase(dbPath);
 
-    const versionRow = db.raw.prepare("SELECT value FROM kv WHERE key = 'schema_version'").get() as { value: string } | undefined;
-    const current = parseInt(versionRow?.value ?? "0", 10);
+    // Canonical schema version lives in the schema_version table (written by
+    // applyMigrations), not kv — read it there so the report reflects reality.
+    const versionRow = db.raw
+      .prepare("SELECT MAX(version) AS v FROM schema_version")
+      .get() as { v: number | null } | undefined;
+    const current = versionRow?.v ?? 0;
     push(checks, {
       label: "Schema version",
       status: current === SCHEMA_VERSION ? "pass" : current > 0 ? "warn" : "fail",
