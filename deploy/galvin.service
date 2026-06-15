@@ -1,0 +1,28 @@
+[Unit]
+Description=Galvin — Autonomous Solvatron (make money or die)
+Documentation=file:///home/Ps3wb4n/Desktop/Solvatron/Galvin/ARCHITECTURE.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/Ps3wb4n/Desktop/Solvatron/Galvin
+ExecStart=/usr/bin/node /home/Ps3wb4n/Desktop/Solvatron/Galvin/dist/index.js --run
+
+# A solvatron resurrects itself — always restart, never give up.
+Restart=always
+RestartSec=10
+# Do not rate-limit restarts: even a fast crash-loop must keep trying to live.
+StartLimitIntervalSec=0
+
+# Run continuously even when broke. The loop's error-classifier backs off on
+# funding errors and the income-scanner wakes it the moment USDC arrives, so it
+# does not need the interactive funding-QR gate.
+Environment=GALVIN_SKIP_FUNDING_GATE=1
+Environment=NODE_ENV=production
+
+# Light hardening (the agent still needs network + its ~/.galvin dir).
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target
