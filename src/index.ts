@@ -27,6 +27,7 @@ import { unlink } from "fs/promises";
 import { runAgentLoop } from "./agent/loop.js";
 import { ModelRegistry } from "./inference/registry.js";
 import { loadSkills } from "./skills/loader.js";
+import { installDefaultSkills } from "./setup/defaults.js";
 import { initStateRepo } from "./git/state-versioning.js";
 // Social adapter now resolved via ./social/registry.js (createSocialAdapter)
 import { PolicyEngine } from "./agent/policy-engine.js";
@@ -86,6 +87,7 @@ async function main(): Promise<void> {
     cmd("--income [days]","Income/expense report (default 30 days)");
     cmd("--tasks",        "List heartbeat tasks and last run times");
     cmd("--wallet",       "Wallet address + USDC balance");
+    cmd("--fund",         "Show funding QR + wait for USDC deposit (alias: --qr)");
     cmd("--memory [q]",   "Search semantic memory for a term");
     cmd("--reset-db",     `${YEL}⚠ Delete DB and start fresh (asks confirmation)${R}`);
     print(`\n  ${DIM}Environment:${R}`);
@@ -267,6 +269,15 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // ─── --qr / --fund ─────────────────────────────────────────
+  // Show the scannable wallet QR + funding screen on demand and poll until the
+  // deposit lands on Base. Same screen the startup gate shows when underfunded.
+  if (args.includes("--qr") || args.includes("--fund")) {
+    const { account } = await getWallet();
+    await awaitFunding(String(account.address), getUsdcBalance, { alwaysShow: true });
+    process.exit(0);
+  }
+
   // ─── --memory ──────────────────────────────────────────────
   if (args.includes("--memory")) {
     const qIdx = args.indexOf("--memory") + 1;
@@ -339,6 +350,23 @@ async function main(): Promise<void> {
   }
 
   if (args.includes("--run")) {
+    // Self-resurrection net: a solvatron must not silently die. On any uncaught
+    // fault, log and exit non-zero so a process supervisor (systemd
+    // Restart=always — see deploy/galvin.service) revives it and survives reboots.
+    process.on("uncaughtException", (err) => {
+      logger.error(
+        "FATAL uncaughtException — exiting for supervisor restart",
+        err instanceof Error ? err : new Error(String(err)),
+      );
+      process.exit(1);
+    });
+    process.on("unhandledRejection", (reason) => {
+      logger.error(
+        "FATAL unhandledRejection — exiting for supervisor restart",
+        reason instanceof Error ? reason : new Error(String(reason)),
+      );
+      process.exit(1);
+    });
     StructuredLogger.setSink(prettySink);
     await run();
     return;
@@ -946,6 +974,7 @@ async function run(): Promise<void> {
   const skillsDir = config.skillsDir || "~/.galvin/skills";
   let skills: Skill[] = [];
   try {
+    installDefaultSkills(skillsDir); // idempotent — backfills new default skills
     skills = loadSkills(skillsDir, db);
     logger.info(`[${new Date().toISOString()}] Loaded ${skills.length} skills.`);
   } catch (err: any) {

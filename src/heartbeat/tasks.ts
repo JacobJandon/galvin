@@ -21,7 +21,15 @@ import { getSurvivalTier } from "../conway/credits.js";
 import { createLogger } from "../observability/logger.js";
 import { getMetrics } from "../observability/metrics.js";
 import { AlertEngine, createDefaultAlertRules } from "../observability/alerts.js";
-import { metricsInsertSnapshot, metricsPruneOld } from "../state/database.js";
+import {
+  metricsInsertSnapshot,
+  metricsPruneOld,
+  updateBountyCandidateStatus,
+} from "../state/database.js";
+import {
+  runBountyScan,
+  BOUNTY_QUEUE_THRESHOLD,
+} from "../earning/bounty-hunter.js";
 import { ulid } from "ulid";
 
 const logger = createLogger("heartbeat.tasks");
@@ -797,17 +805,32 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
       const currentBlock = await client.getBlockNumber();
       const fromBlockHex = taskCtx.db.getKV("income_scan_from_block");
       // Default: scan last 1000 blocks (~33 minutes of Base L2 history)
-      const fromBlock = fromBlockHex
+      let fromBlock = fromBlockHex
         ? BigInt(fromBlockHex)
         : currentBlock - BigInt(1000);
 
-      const logs = await client.getLogs({
-        address: USDC_BASE,
-        event: TRANSFER_ABI[0]!,
-        args: { to: walletAddress },
-        fromBlock,
-        toBlock: currentBlock,
-      });
+      // Guard: after long downtime the cursor can lag tens of thousands of
+      // blocks. Cap the catch-up window so we never attempt a months-long scan.
+      const MAX_LOOKBACK = BigInt(200_000); // ~1.2 days of Base L2 history
+      if (currentBlock - fromBlock > MAX_LOOKBACK) {
+        fromBlock = currentBlock - MAX_LOOKBACK;
+      }
+
+      // Public Base RPCs cap eth_getLogs at a 10,000-block range, so chunk the
+      // scan into ≤9,000-block windows and accumulate (fixes HTTP 413 -32614).
+      const CHUNK = BigInt(9_000);
+      const logs: any[] = [];
+      for (let start = fromBlock; start <= currentBlock; start += CHUNK + BigInt(1)) {
+        const end = start + CHUNK > currentBlock ? currentBlock : start + CHUNK;
+        const chunkLogs = await client.getLogs({
+          address: USDC_BASE,
+          event: TRANSFER_ABI[0]!,
+          args: { to: walletAddress },
+          fromBlock: start,
+          toBlock: end,
+        });
+        logs.push(...chunkLogs);
+      }
 
       // Advance scan cursor
       taskCtx.db.setKV("income_scan_from_block", `0x${currentBlock.toString(16)}`);
@@ -845,6 +868,55 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
       };
     } catch (err: any) {
       logger.warn(`income_scanner failed: ${err?.message}`);
+      return { shouldWake: false };
+    }
+  },
+
+  bounty_scan: async (ctx: TickContext, taskCtx: HeartbeatLegacyContext) => {
+    if (process.env.GALVIN_BOUNTY_ENABLED === "false") {
+      return { shouldWake: false };
+    }
+
+    // Rate limit: scan at most once per interval (default 6h)
+    const intervalMs =
+      Number(process.env.GALVIN_BOUNTY_SCAN_INTERVAL_MS) || 6 * 3_600_000;
+    const lastScan = taskCtx.db.getKV("bounty_scan_last_run");
+    if (lastScan && Date.now() - Date.parse(lastScan) < intervalMs) {
+      return { shouldWake: false };
+    }
+
+    try {
+      const result = await runBountyScan(taskCtx.db.raw, {
+        githubToken:
+          process.env.GALVIN_GITHUB_TOKEN || process.env.GITHUB_TOKEN,
+      });
+      taskCtx.db.setKV("bounty_scan_last_run", new Date().toISOString());
+      taskCtx.db.setKV(
+        "last_bounty_scan",
+        JSON.stringify({
+          timestamp: new Date().toISOString(),
+          scanned: result.scanned,
+          eligible: result.eligible,
+          newCandidates: result.newCandidates.length,
+        }),
+      );
+
+      const top = result.newCandidates.find(
+        (c) => c.score >= BOUNTY_QUEUE_THRESHOLD,
+      );
+      if (!top) return { shouldWake: false };
+
+      updateBountyCandidateStatus(taskCtx.db.raw, top.id, "queued");
+      const budget = (top.attemptBudgetCents / 100).toFixed(2);
+      return {
+        shouldWake: true,
+        message:
+          `Bounty queued: "${top.title}" — $${top.amountUsd} at ${top.repo}#${top.issueNumber} ` +
+          `(score ${top.score}/100). Inference budget: $${budget}. ` +
+          `Follow the bounty-hunter skill procedure. URL: ${top.url}`,
+      };
+    } catch (err: any) {
+      logger.warn(`bounty_scan failed: ${err?.message}`);
       return { shouldWake: false };
     }
   },

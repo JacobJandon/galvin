@@ -19,34 +19,57 @@ import {
   stopFundingScreen,
 } from "./banner.js";
 
-/** Minimum USDC (dollars) required on Base before loops will start. */
-export const MINIMUM_USDC = 1.0;
+/**
+ * Minimum USDC (dollars) required on Base before loops will start.
+ * $5 is the bootstrap-topup floor: below it the agent cannot buy any compute
+ * and just spins in the critical/dead tier (insufficient_quota every turn), so
+ * there is no point starting — show the funding QR instead.
+ */
+export const MINIMUM_USDC = 5.0;
 
 /** Polling interval in seconds. */
 const CHECK_INTERVAL_SEC = 30;
 
+export interface AwaitFundingOptions {
+  /** Override the funding threshold in dollars. Defaults to MINIMUM_USDC. */
+  minimum?: number;
+  /** Always render the funding screen even if already funded. Used by the
+   *  on-demand `galvin --fund` / `galvin --qr` command. */
+  alwaysShow?: boolean;
+}
+
 /**
- * Block until the wallet holds ≥ MINIMUM_USDC USDC on Base Mainnet.
+ * Block until the wallet holds ≥ `minimum` USDC on Base Mainnet.
  *
- * - If the wallet is already funded, returns immediately without showing anything.
+ * - If already funded (and not `alwaysShow`), returns immediately.
  * - Otherwise shows the full QR funding screen (startup mode) and polls every
  *   CHECK_INTERVAL_SEC seconds until the balance is confirmed on-chain.
  * - Auto-proceeds — no restart needed.
  *
+ * Escape hatch: `GALVIN_SKIP_FUNDING_GATE=1` bypasses the gate entirely (e.g.
+ * when funding inference via a provider key rather than the wallet).
+ *
  * @param address    Hex wallet address (`0x…`)
  * @param getBalance Function that returns the current USDC balance in dollars
+ * @param opts       Threshold / always-show overrides
  */
 export async function awaitFunding(
   address:    string,
   getBalance: (addr: `0x${string}`) => Promise<number>,
+  opts:       AwaitFundingOptions = {},
 ): Promise<void> {
+  const minimum = opts.minimum ?? MINIMUM_USDC;
+
+  // Escape hatch for non-wallet funding (provider key, etc.)
+  if (!opts.alwaysShow && process.env.GALVIN_SKIP_FUNDING_GATE === "1") return;
+
   // Quick initial check — skip the screen entirely if already funded
   let balance = 0;
   try {
     balance = await getBalance(address as `0x${string}`);
   } catch { /* treat as zero — network may not be up yet */ }
 
-  if (balance >= MINIMUM_USDC) return;
+  if (!opts.alwaysShow && balance >= minimum) return;
 
   // ── Show startup funding gate ─────────────────────────────────────────────
   showFundingScreen(address, "", CHECK_INTERVAL_SEC, "startup");
@@ -57,7 +80,7 @@ export async function awaitFunding(
     updateFundingStatus(0, CHECK_INTERVAL_SEC);
     try {
       balance = await getBalance(address as `0x${string}`);
-      if (balance >= MINIMUM_USDC) { funded = true; break; }
+      if (balance >= minimum) { funded = true; break; }
     } catch { /* retry */ }
 
     // Countdown to next check

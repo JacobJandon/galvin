@@ -59,6 +59,8 @@ import { PlanModeController } from "../orchestration/plan-mode.js";
 import { generateTodoMd, injectTodoContext } from "../orchestration/attention.js";
 import { ColonyMessaging, LocalDBTransport } from "../orchestration/messaging.js";
 import { LocalWorkerPool } from "../orchestration/local-worker.js";
+import { LoopDetector } from "./loop-detector.js";
+import { classifyError } from "./error-classifier.js";
 import { SimpleAgentTracker, SimpleFundingProtocol } from "../orchestration/simple-tracker.js";
 import { ContextManager, createTokenCounter } from "../memory/context-manager.js";
 import { CompressionEngine } from "../memory/compression-engine.js";
@@ -70,6 +72,9 @@ import { UnifiedInferenceClient } from "../inference/inference-client.js";
 const logger = createLogger("loop");
 const MAX_TOOL_CALLS_PER_TURN = 10;
 const MAX_CONSECUTIVE_ERRORS = 5;
+// Funding / rate-limit / transient errors aren't bugs — tolerate more of them
+// (with back-off) before a long sleep, so a blip or being broke isn't "death".
+const MAX_SOFT_ERRORS = 12;
 const MAX_REPETITIVE_TURNS = 3;
 
 export interface AgentLoopOptions {
@@ -356,6 +361,7 @@ export async function runAgentLoop(
   }
 
   let consecutiveErrors = 0;
+  let softErrors = 0;
   let running = true;
   let lastToolPatterns: string[] = [];
   let loopWarningPattern: string | null = null;
@@ -413,6 +419,12 @@ export async function runAgentLoop(
     content: wakeupInput,
     source: "wakeup",
   };
+
+  // Anti-repetition guard (ported from automaton). Records each tool call and
+  // catches identical-call / idle-only / repeated-pattern loops, then feeds the
+  // model a corrective instruction so it breaks out instead of spinning.
+  const loopDetector = new LoopDetector();
+  let pendingLoopFeedback: string | undefined;
 
   while (running) {
     // Declared outside try so the catch block can access for retry/failure handling
@@ -659,6 +671,12 @@ export async function runAgentLoop(
       const survivalTier = getSurvivalTier(financial.creditsCents);
       log(config, `[THINK] Routing inference (tier: ${survivalTier}, model: ${inference.getDefaultModel()})...`);
 
+      // Inject loop-detector corrective feedback carried over from the prior turn.
+      if (pendingLoopFeedback) {
+        messages.push({ role: "user", content: pendingLoopFeedback });
+        pendingLoopFeedback = undefined;
+      }
+
       const inferenceTools = toolsToInferenceFormat(tools);
       const routerResult = await inferenceRouter.route(
         {
@@ -716,6 +734,21 @@ export async function runAgentLoop(
             args = {};
           }
 
+          const loopCheck = loopDetector.recordToolCall(tc.function.name, tc.function.arguments);
+          if (loopCheck.blocked) {
+            log(config, `[LOOP] Blocked ${tc.function.name}: ${loopCheck.reason.slice(0, 80)}`);
+            turn.toolCalls.push({
+              id: tc.id,
+              name: tc.function.name,
+              arguments: args,
+              result: loopCheck.reason,
+              durationMs: 0,
+              error: "loop_detected",
+            });
+            callCount++;
+            continue;
+          }
+
           log(config, `[TOOL] ${tc.function.name}(${JSON.stringify(args).slice(0, 100)})`);
 
           const result = await executeTool(
@@ -742,6 +775,13 @@ export async function runAgentLoop(
 
           callCount++;
         }
+      }
+
+      // End-of-turn loop check: catches repeated-pattern and idle-only loops.
+      const turnLoopCheck = loopDetector.endTurn();
+      if (turnLoopCheck.reason) {
+        pendingLoopFeedback = turnLoopCheck.reason;
+        log(config, `[LOOP] ${turnLoopCheck.reason.slice(0, 80)}`);
       }
 
       // ── Persist Turn (atomic: turn + tool calls + inbox ack) ──
@@ -948,9 +988,10 @@ export async function runAgentLoop(
       }
 
       consecutiveErrors = 0;
+      softErrors = 0;
     } catch (err: any) {
-      consecutiveErrors++;
-      log(config, `[ERROR] Turn failed: ${err.message}`);
+      const classified = classifyError(err);
+      log(config, `[ERROR] Turn failed (${classified.category}): ${err.message}`);
 
       // Handle inbox message state on turn failure:
       // Messages that have retries remaining go back to 'received';
@@ -969,18 +1010,39 @@ export async function runAgentLoop(
         }
       }
 
-      if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+      if (classified.category === "fatal") {
+        consecutiveErrors++;
+        if (consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+          log(
+            config,
+            `[FATAL] ${MAX_CONSECUTIVE_ERRORS} consecutive errors. Sleeping.`,
+          );
+          db.setAgentState("sleeping");
+          onStateChange?.("sleeping");
+          db.setKV(
+            "sleep_until",
+            new Date(Date.now() + 300_000).toISOString(),
+          );
+          running = false;
+        }
+      } else {
+        // Not a bug (funding / rate-limit / transient): back off instead of
+        // counting toward "death". Funding errors (broke) stop this run and let
+        // the heartbeat/income-scanner revive once money or a provider returns.
+        softErrors++;
         log(
           config,
-          `[FATAL] ${MAX_CONSECUTIVE_ERRORS} consecutive errors. Sleeping.`,
+          `[RECOVER] ${classified.category}: ${classified.reason} — backing off ${Math.round(classified.backoffMs / 1000)}s`,
         );
-        db.setAgentState("sleeping");
-        onStateChange?.("sleeping");
         db.setKV(
           "sleep_until",
-          new Date(Date.now() + 300_000).toISOString(),
+          new Date(Date.now() + classified.backoffMs).toISOString(),
         );
-        running = false;
+        if (classified.category === "funding" || softErrors >= MAX_SOFT_ERRORS) {
+          db.setAgentState("sleeping");
+          onStateChange?.("sleeping");
+          running = false;
+        }
       }
     }
   }

@@ -308,7 +308,7 @@ export class LocalWorkerPool {
 
   private buildWorkerSystemPrompt(task: TaskNode): string {
     const role = task.agentRole ?? "generalist";
-    return `You are a worker agent with the role: ${role}.
+    const base = `You are a worker agent with the role: ${role}.
 
 You have been assigned a specific task by the parent orchestrator. Your job is to
 complete this task using the tools available to you and then provide your final output.
@@ -323,6 +323,23 @@ RULES:
 - Do NOT call tools after you are done. Just give your final text response.
 - Be efficient. Minimize unnecessary tool calls.
 - You have a limited number of turns. Do not waste them.`;
+
+    // Coding/implementation tasks get the proven coding methodology, adapted from
+    // automaton's CodingHarness into Galvin's worker (exec / write_file / read_file).
+    const isCoding = /cod|implement|develop|engineer|build|fix|refactor|debug|test|feature|bug/i.test(
+      `${role} ${task.title}`,
+    );
+    if (!isCoding) return base;
+
+    return `${base}
+
+## Coding Discipline (implementation tasks)
+- Read existing code with read_file BEFORE modifying it — understand structure and conventions first.
+- Make minimal, targeted changes. Do NOT refactor code outside this task's scope.
+- Follow existing conventions (indentation, naming, imports). Comment non-obvious logic. Handle errors explicitly — no silent catches.
+- Write tests for new functionality and run them with exec until green before finishing.
+- If a build/test fails, read the error and fix the SPECIFIC issue. Do NOT re-run the exact same failing command — change your approach.
+- If stuck after 3 attempts on the same problem, finish with an honest failure summary (files touched, what you tried, why it failed).`;
   }
 
   private buildTaskPrompt(task: TaskNode): string {

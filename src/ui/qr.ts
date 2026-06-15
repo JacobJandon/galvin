@@ -94,8 +94,9 @@ function centre(text: string, width: number): string {
  * Call .start() to render, .updateStatus(secondsLeft, total) to tick,
  * .stop() to restore the terminal.
  */
-/** Minimum USDC (dollars) required before Galvin will start. */
-export const MINIMUM_USDC = 1.0;
+/** Minimum USDC (dollars) shown on the funding screen. Kept in sync with
+ *  funding-gate.ts MINIMUM_USDC — the bootstrap-topup floor. */
+export const MINIMUM_USDC = 5.0;
 
 // Short USDC contract for display (first 6 … last 4)
 const USDC_ADDR  = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -214,7 +215,7 @@ export class MatrixRain {
     add(kv("Wallet",  `${CYN}${BOLD}${shortAddr}${RESET}`));
     add(kv("Network", `${G_BRIGHT}Base Mainnet${RESET}  ${DIM_S}·  chain 8453  ·  eip155:8453${RESET}`));
     add(kv("Asset",   `${G_BRIGHT}USDC${RESET}  ${DIM_S}·  ${USDC_ADDR}${RESET}`));
-    add(kv("Minimum", `${YEL}${BOLD}$${MINIMUM_USDC.toFixed(2)} USDC${RESET}  ${DIM_S}($5.00 recommended for bootstrap)${RESET}`));
+    add(kv("Minimum", `${YEL}${BOLD}$${MINIMUM_USDC.toFixed(2)} USDC${RESET}  ${DIM_S}(bootstrap floor — buys first compute)${RESET}`));
 
     // ── Footer ───────────────────────────────────────────────────────────────
     add(`${lpad}${bdr}╠${"─".repeat(w - 2)}╣${RESET}`);
@@ -250,7 +251,7 @@ export function printMatrixStatic(address: string, mode: "dead" | "startup" = "d
   console.log(`${G + W}  ║${R}  ${D}Wallet ${R}  ${C + W}${address}${R}  ${G + W}║${R}`);
   console.log(`${G + W}  ║${R}  ${D}Network${R}  ${G + W}Base Mainnet${R}  ${D}·  chain 8453  ·  eip155:8453${R}  ${G + W}║${R}`);
   console.log(`${G + W}  ║${R}  ${D}Asset  ${R}  ${G + W}USDC${R}  ${D}·  ${USDC_ADDR}${R}  ${G + W}║${R}`);
-  console.log(`${G + W}  ║${R}  ${D}Minimum${R}  ${Y + W}$${MINIMUM_USDC.toFixed(2)} USDC${R}  ${D}($5.00 recommended)${R}  ${G + W}║${R}`);
+  console.log(`${G + W}  ║${R}  ${D}Minimum${R}  ${Y + W}$${MINIMUM_USDC.toFixed(2)} USDC${R}  ${D}(bootstrap floor)${R}  ${G + W}║${R}`);
   console.log(`${G + W}  ╠══════════════════════════════════════════════════════╣${R}`);
   console.log(`${G + W}  ║${R}  ${D}Bridge ${R}  ${C}https://bridge.base.org${R}  ${D}(ETH → USDC on Base)${R}  ${G + W}║${R}`);
   console.log(`${G + W}  ╚══════════════════════════════════════════════════════╝${R}`);
