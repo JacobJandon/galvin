@@ -12,6 +12,8 @@
  */
 
 import http from "http";
+import fs from "fs";
+import path from "path";
 import { createLogger } from "../observability/logger.js";
 import { writeLock, removeLock } from "./lock.js";
 import type { GalvinDatabase, GalvinConfig } from "../types.js";
@@ -88,6 +90,57 @@ export async function startGateway(opts: GatewayOptions): Promise<GatewayServer>
           version: config.version || "0.3.0",
           name: config.name,
         });
+        return;
+      }
+
+      // ── GET /registry/self → this agent's verifiable trust record (V1) ──
+      if (method === "GET" && pathname === "/registry/self") {
+        (async () => {
+          try {
+            const { buildTrustRecord, verifyTrustRecord } = await import("../registry/trust-record.js");
+            const home = process.env.HOME ?? "";
+            let createdAt: string | undefined;
+            try {
+              createdAt = JSON.parse(fs.readFileSync(path.join(home, ".galvin", "wallet.json"), "utf8")).createdAt;
+            } catch { /* unknown creation date */ }
+            let constitutionPath: string | undefined;
+            for (const p of [path.join(process.cwd(), "constitution.md"), path.join(home, ".galvin", "constitution.md")]) {
+              if (fs.existsSync(p)) { constitutionPath = p; break; }
+            }
+            const record = buildTrustRecord({
+              rawDb: db.raw,
+              walletAddress: address,
+              chainType: (config as { chainType?: string }).chainType ?? "evm",
+              name: config.name,
+              constitutionPath,
+              createdAt,
+            });
+            json(res, url.searchParams.get("verify") === "1"
+              ? await verifyTrustRecord(record, {
+                  easSchemaUid: (config as { easSchemaUid?: string }).easSchemaUid,
+                  easNetwork: (config as { easNetwork?: string }).easNetwork,
+                })
+              : record);
+          } catch (e) {
+            json(res, { error: e instanceof Error ? e.message : String(e) }, 500);
+          }
+        })();
+        return;
+      }
+
+      // ── GET /registry/honeypot?url=… → public-good scam/honeypot check (V9) ──
+      if (method === "GET" && pathname === "/registry/honeypot") {
+        const target = url.searchParams.get("url");
+        if (!target) { badRequest(res, "missing ?url= query param"); return; }
+        (async () => {
+          try {
+            const { checkHoneypot } = await import("../registry/honeypot-registry.js");
+            const verdict = await checkHoneypot(target, { githubToken: (config as { githubToken?: string }).githubToken });
+            json(res, verdict);
+          } catch (e) {
+            json(res, { error: e instanceof Error ? e.message : String(e) }, 500);
+          }
+        })();
         return;
       }
 

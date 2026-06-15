@@ -3611,6 +3611,120 @@ Model: ${ctx.inference.getDefaultModel()}
       },
     },
 
+    // ── Earning: Bounty Hunting ──
+    {
+      name: "list_bounties",
+      description:
+        "List bounty candidates found by the bounty_scan heartbeat (GitHub/Algora issues with cash bounties). " +
+        "Each candidate has a score (0-100), bounty amount in USD, and a hard inference budget for the attempt. " +
+        "Lifecycle: found → queued → attempting → submitted → paid | rejected | abandoned.",
+      category: "financial" as ToolCategory,
+      riskLevel: "safe" as RiskLevel,
+      parameters: {
+        type: "object",
+        properties: {
+          status: {
+            type: "string",
+            description:
+              "Filter by status: found, queued, attempting, submitted, paid, rejected, abandoned (default: all)",
+          },
+          limit: {
+            type: "number",
+            description: "Max results (default: 10)",
+          },
+        },
+      },
+      execute: async (args, ctx) => {
+        const { getBountyCandidates } = await import("../state/database.js");
+        const status = args.status as
+          | import("../state/database.js").BountyStatus
+          | undefined;
+        const rows = getBountyCandidates(
+          ctx.db.raw,
+          status,
+          (args.limit as number) || 10,
+        );
+        if (rows.length === 0) {
+          return status
+            ? `No bounty candidates with status '${status}'.`
+            : "No bounty candidates yet. The bounty_scan heartbeat searches GitHub every 6 hours.";
+        }
+        return rows
+          .map(
+            (b) =>
+              `[${b.status}] id=${b.id} score=${b.score}/100 $${b.amountUsd} ` +
+              `budget=$${(b.attemptBudgetCents / 100).toFixed(2)} spent=$${(b.spentCents / 100).toFixed(2)}\n` +
+              `  ${b.title}\n  ${b.url}`,
+          )
+          .join("\n\n");
+      },
+    },
+    {
+      name: "update_bounty",
+      description:
+        "Update a bounty candidate's lifecycle status and/or record inference spend against its budget. " +
+        "Returns the remaining budget. If the remaining budget is negative you MUST abandon the attempt. " +
+        "Setting status to 'paid' records the bounty amount as bounty-hunter skill income.",
+      category: "financial" as ToolCategory,
+      riskLevel: "caution" as RiskLevel,
+      parameters: {
+        type: "object",
+        properties: {
+          id: {
+            type: "string",
+            description: "Bounty candidate id (from list_bounties)",
+          },
+          status: {
+            type: "string",
+            description:
+              "New status: queued, attempting, submitted, paid, rejected, abandoned (optional)",
+          },
+          spend_cents: {
+            type: "number",
+            description: "Inference cents spent since the last update (optional)",
+          },
+        },
+        required: ["id"],
+      },
+      execute: async (args, ctx) => {
+        const dbMod = await import("../state/database.js");
+        const id = String(args.id);
+        const bounty = dbMod.getBountyCandidateById(ctx.db.raw, id);
+        if (!bounty) return `No bounty candidate with id ${id}. Use list_bounties first.`;
+
+        const lines: string[] = [];
+        if (args.status) {
+          const status = String(args.status) as import("../state/database.js").BountyStatus;
+          const valid = ["found", "queued", "attempting", "submitted", "paid", "rejected", "abandoned"];
+          if (!valid.includes(status)) {
+            return `Invalid status '${status}'. Valid: ${valid.join(", ")}`;
+          }
+          dbMod.updateBountyCandidateStatus(ctx.db.raw, id, status);
+          lines.push(`Status: ${bounty.status} → ${status}`);
+          if (status === "paid") {
+            const { recordIncome } = await import("../earning/optimizer.js");
+            recordIncome(ctx.db.raw, "bounty-hunter", bounty.amountUsd);
+            lines.push(`Income recorded: $${bounty.amountUsd} attributed to bounty-hunter skill.`);
+          }
+        }
+
+        let remaining = bounty.attemptBudgetCents - bounty.spentCents;
+        if (typeof args.spend_cents === "number" && args.spend_cents > 0) {
+          remaining = dbMod.addBountyCandidateSpend(
+            ctx.db.raw,
+            id,
+            Math.round(args.spend_cents),
+          );
+          lines.push(`Spend recorded: ${Math.round(args.spend_cents)}¢.`);
+        }
+        lines.push(
+          `Budget remaining: $${(remaining / 100).toFixed(2)}` +
+            (remaining < 0 ? " — OVER BUDGET. Abandon this attempt now." : ""),
+        );
+        return lines.join("\n");
+      },
+    },
+
     // ── Reputation: EAS On-Chain Attestations ──
     {
       name: "get_reputation",

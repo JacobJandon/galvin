@@ -5,7 +5,7 @@
  * The database IS Galvin's memory.
  */
 
-export const SCHEMA_VERSION = 13;
+export const SCHEMA_VERSION = 14;
 
 export const CREATE_TABLES = `
   -- Schema version tracking
@@ -700,4 +700,27 @@ export const MIGRATION_V13 = `
     read       INTEGER NOT NULL DEFAULT 0
   );
   CREATE INDEX IF NOT EXISTS idx_chat_unread ON chat_messages(role, read) WHERE read = 0;
+`;
+
+export const MIGRATION_V14 = `
+  -- Schema version: 14
+  -- Bounty hunting: GitHub/Algora bounty candidates with attempt lifecycle + budget guard
+  CREATE TABLE IF NOT EXISTS bounty_candidates (
+    id                   TEXT PRIMARY KEY,
+    url                  TEXT NOT NULL UNIQUE,
+    repo                 TEXT NOT NULL,           -- owner/name
+    issue_number         INTEGER NOT NULL,
+    title                TEXT NOT NULL,           -- sanitized before insert
+    amount_usd           REAL NOT NULL CHECK(amount_usd >= 0),
+    score                INTEGER NOT NULL DEFAULT 0,
+    score_reasons        TEXT NOT NULL DEFAULT '[]',  -- JSON array of strings
+    status               TEXT NOT NULL DEFAULT 'found'
+                         CHECK(status IN ('found','queued','attempting','submitted','paid','rejected','abandoned')),
+    attempt_budget_cents INTEGER NOT NULL DEFAULT 0,  -- max inference spend for this bounty
+    spent_cents          INTEGER NOT NULL DEFAULT 0,
+    created_at           TEXT NOT NULL,
+    updated_at           TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_bounty_status ON bounty_candidates(status, score DESC);
+  CREATE INDEX IF NOT EXISTS idx_bounty_repo   ON bounty_candidates(repo);
 `;
