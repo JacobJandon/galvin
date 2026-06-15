@@ -5,10 +5,13 @@
  */
 
 import type { PrivateKeyAccount, Address } from "viem";
+import type { ChainType } from "./identity/chain.js";
 
 // ─── Identity ────────────────────────────────────────────────────
 
 export interface GalvinIdentity {
+  /** Which chain the agent lives on. Defaults to EVM (Base) when unset. */
+  chainType?: ChainType;
   name: string;
   address: Address;
   account: PrivateKeyAccount;
@@ -32,6 +35,7 @@ export interface ProvisionResult {
 // ─── Configuration ───────────────────────────────────────────────
 
 export interface GalvinConfig {
+  chainType?: ChainType;
   name: string;
   genesisPrompt: string;
   creatorMessage?: string;
@@ -161,6 +165,16 @@ export interface GalvinTool {
   riskLevel: RiskLevel;
   category: ToolCategory;
 }
+
+/**
+ * Upstream-automaton compatibility aliases. Galvin renamed the three core types
+ * with a "Galvin" prefix; code ported verbatim from Conway-Research/automaton
+ * imports the original "Automaton" names. These aliases let that code compile
+ * unchanged, so future upstream ports stay copy-paste.
+ */
+export type AutomatonIdentity = GalvinIdentity;
+export type AutomatonConfig   = GalvinConfig;
+export type AutomatonTool     = GalvinTool;
 
 export type ToolCategory =
   | "vm"
@@ -861,6 +875,7 @@ export interface DiscoveredAgent {
 // ─── Replication ────────────────────────────────────────────────
 
 export interface ChildAgent {
+  chainType?: ChainType;
   id: string;
   name: string;
   address: Address;
@@ -893,6 +908,7 @@ export type ChildStatus =
   | "cleaned_up";
 
 export interface GenesisConfig {
+  chainType?: ChainType;
   name: string;
   genesisPrompt: string;
   creatorMessage?: string;

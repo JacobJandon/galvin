@@ -56,10 +56,94 @@ export interface PlannerContext {
   workspaceFiles: string[];
 }
 
+export interface PlannerGoalInput {
+  id: string;
+  title: string;
+  description: string;
+  status: Goal["status"] | string;
+  strategy: string | null;
+  rootTasks: string[];
+  expectedRevenueCents: number;
+  actualRevenueCents: number;
+  createdAt: string;
+  deadline: string | null;
+}
+
+export interface PlannerFailureInput {
+  id: string;
+  title: string;
+  description: string;
+  status: TaskNode["status"] | string;
+  agentRole: string | null;
+  dependencies: string[];
+  assignedTo: string | null;
+  result: TaskNode["result"];
+  metadata: TaskNode["metadata"];
+}
+
+export function taskToPlannerFailureInput(task: TaskNode): PlannerFailureInput {
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    status: task.status,
+    agentRole: task.agentRole,
+    dependencies: [...task.dependencies],
+    assignedTo: task.assignedTo,
+    result: task.result,
+    metadata: task.metadata,
+  };
+}
+
+export function createPlannerGoalFromTask(task: Pick<
+  TaskNode,
+  "id" | "goalId" | "title" | "description" | "status" | "dependencies" | "metadata"
+>): PlannerGoalInput {
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    status: task.status,
+    strategy: `Subplan for goal ${task.goalId}`,
+    rootTasks: [...task.dependencies],
+    expectedRevenueCents: 0,
+    actualRevenueCents: 0,
+    createdAt: task.metadata.createdAt,
+    deadline: null,
+  };
+}
+
+export function createPlannerFailureFromVerification(params: {
+  task: TaskNode;
+  output: string;
+  note?: string;
+}): PlannerFailureInput {
+  return {
+    id: params.task.id,
+    title: params.task.title,
+    description: `${params.task.description}\n\nVerification failure: ${params.note ?? "Result did not satisfy verification criteria."}`.trim(),
+    status: "failed",
+    agentRole: params.task.agentRole,
+    dependencies: [...params.task.dependencies],
+    assignedTo: params.task.assignedTo,
+    result: {
+      ...(params.task.result ?? {
+        success: false,
+        artifacts: [],
+        costCents: 0,
+        duration: 0,
+      }),
+      success: false,
+      output: params.output,
+    },
+    metadata: params.task.metadata,
+  };
+}
+
 const MODEL_TIERS: readonly ModelTier[] = ["reasoning", "fast", "cheap"];
 
 export async function planGoal(
-  goal: Goal,
+  goal: PlannerGoalInput,
   context: PlannerContext,
   inference: UnifiedInferenceClient,
 ): Promise<PlannerOutput> {
@@ -86,8 +170,8 @@ export async function planGoal(
 }
 
 export async function replanAfterFailure(
-  goal: Goal,
-  failedTask: TaskNode,
+  goal: PlannerGoalInput,
+  failedTask: PlannerFailureInput,
   context: PlannerContext,
   inference: UnifiedInferenceClient,
 ): Promise<PlannerOutput> {
@@ -440,8 +524,8 @@ export function validatePlannerOutput(output: unknown): PlannerOutput {
 
 function buildPlannerUserPrompt(params: {
   mode: "plan_goal" | "replan_after_failure";
-  goal: Goal;
-  failedTask?: TaskNode;
+  goal: PlannerGoalInput;
+  failedTask?: PlannerFailureInput;
 }): string {
   const payload: Record<string, unknown> = {
     mode: params.mode,

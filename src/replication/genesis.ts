@@ -111,6 +111,7 @@ export function generateGenesisConfig(
   }
 
   const result: GenesisConfig = {
+    chainType: (identity as { chainType?: "evm" | "solana" }).chainType ?? "evm",
     name: params.name,
     genesisPrompt,
     creatorMessage: params.message,
