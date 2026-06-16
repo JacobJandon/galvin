@@ -94,6 +94,7 @@ async function main(): Promise<void> {
     cmd("--owner [sub]",  "Ownership: prove (challenge) · verify <0x-signature>");
     cmd("--honeypot <url>", "Check if a GitHub repo/bounty is a honeypot");
     cmd("--bounties",     "List queued bounty candidates");
+    cmd("--skills [q]",   "Search the skill index (installed + cached marketplace)");
     cmd("--memory [q]",   "Search semantic memory for a term");
     cmd("--reset-db",     `${YEL}⚠ Delete DB and start fresh (asks confirmation)${R}`);
     print(`\n  ${DIM}Environment:${R}`);
@@ -424,6 +425,29 @@ async function main(): Promise<void> {
     print(ch.statement.split("\n").map((l) => "  " + l).join("\n"));
     print(`  ${DIM}────────────────────────────────────────${R}`);
     print(`  Then run:  ${G2}galvin --owner verify <0x-signature>${R}   ${DIM}(challenge saved, expires in 10m)${R}`);
+    gap();
+    process.exit(0);
+  }
+
+  // ─── --skills [query] → offline skill index (installed + cached marketplace) ──
+  if (args.includes("--skills")) {
+    const config = loadConfig();
+    if (!config) { print(`  ${FAIL}  Not configured.`); process.exit(1); }
+    const i = args.indexOf("--skills");
+    const query = args.slice(i + 1).filter((a) => !a.startsWith("--")).join(" ");
+    const db = createDatabase(resolvePath(config.dbPath));
+    const { buildSkillIndex, searchSkillIndex, isCacheStale } = await import("./skills/index-cache.js");
+    const index = buildSkillIndex(db);
+    const rows = query ? searchSkillIndex(index, query, 20) : index.slice(0, 30);
+    boxHeader(query ? `Skills matching "${query}"  ${rows.length}` : `Skill Index  ${index.length}`);
+    gap();
+    if (rows.length === 0) print(`  ${DIM}none yet — the agent's search_skills discovers + caches marketplace skills${R}`);
+    for (const r of rows) {
+      const badge = r.installed ? `${G}✓ installed${R}` : `${DIM}marketplace${R}`;
+      const tags = r.tags.length ? `${DIM}[${r.tags.join(",")}]${R}  ` : "";
+      print(`  ${badge}  ${B}${r.name}${R}  ${tags}${DIM}${String(r.description).slice(0, 48)}${R}`);
+    }
+    if (isCacheStale()) print(`\n  ${DIM}marketplace cache stale — refreshed on the agent's next search_skills${R}`);
     gap();
     process.exit(0);
   }

@@ -2507,6 +2507,11 @@ Model: ${ctx.inference.getDefaultModel()}
         const { queryMarketplace } = await import("../registry/discovery.js");
         const limit = Math.min(25, Math.max(1, Number(args.limit ?? 10)));
         const results = await queryMarketplace(String(args.query), (ctx.db as any).raw, limit);
+        // Cache the live listings so future discovery is instant and works offline.
+        try {
+          const { cacheMarketplaceListings } = await import("../skills/index-cache.js");
+          cacheMarketplaceListings(results as any);
+        } catch { /* cache is best-effort */ }
         if (results.length === 0) {
           return `No skills found for "${args.query}". Try a broader search term, or publish your own.`;
         }
