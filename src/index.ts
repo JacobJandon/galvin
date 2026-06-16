@@ -95,6 +95,7 @@ async function main(): Promise<void> {
     cmd("--honeypot <url>", "Check if a GitHub repo/bounty is a honeypot");
     cmd("--bounties",     "List queued bounty candidates");
     cmd("--skills [q]",   "Search the skill index (installed + cached marketplace)");
+    cmd("--compute",      "Show + self-test the compute backend (local/ssh/…)");
     cmd("--memory [q]",   "Search semantic memory for a term");
     cmd("--reset-db",     `${YEL}⚠ Delete DB and start fresh (asks confirmation)${R}`);
     print(`\n  ${DIM}Environment:${R}`);
@@ -448,6 +449,26 @@ async function main(): Promise<void> {
       print(`  ${badge}  ${B}${r.name}${R}  ${tags}${DIM}${String(r.description).slice(0, 48)}${R}`);
     }
     if (isCacheStale()) print(`\n  ${DIM}marketplace cache stale — refreshed on the agent's next search_skills${R}`);
+    gap();
+    process.exit(0);
+  }
+
+  // ─── --compute → show + self-test the configured compute backend ──
+  if (args.includes("--compute")) {
+    const config = loadConfig();
+    const { getComputeBackend } = await import("./compute/backend.js");
+    const computeCfg = (config as { compute?: { backend?: "local" | "ssh" | "modal" | "daytona"; ssh?: { host: string } } } | null)?.compute ?? {};
+    let backend;
+    try { backend = getComputeBackend(computeCfg); }
+    catch (e) { print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`); process.exit(1); }
+    boxHeader("Compute Backend");
+    gap();
+    kv("Backend", `${backend.kind}  ${DIM}(${backend.describe()})${R}`);
+    print(`  ${INFO}  self-test…`);
+    const r = await backend.exec("echo galvin-compute-ok").catch((e) => ({ stdout: "", stderr: String(e?.message ?? e), exitCode: 1 }));
+    if (r.exitCode === 0 && r.stdout.includes("galvin-compute-ok")) print(`  ${G}✓ working${R}  (${backend.kind})`);
+    else print(`  ${RED}✗ failed${R}  ${String(r.stderr).slice(0, 80)}`);
+    print(`  ${DIM}set in galvin.json: "compute": { "backend": "ssh", "ssh": { "host": "user@box" } }${R}`);
     gap();
     process.exit(0);
   }
