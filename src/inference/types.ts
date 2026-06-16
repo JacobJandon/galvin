@@ -132,6 +132,65 @@ export const STATIC_MODEL_BASELINE: Omit<ModelEntry, "lastSeen" | "createdAt" | 
     parameterStyle: "max_completion_tokens",
     enabled: true,
   },
+  // === Anthropic Claude (latest) — the reasoning models Polsia runs on, via
+  // Anthropic's OpenAI-compatible endpoint. Only routed to when ANTHROPIC_API_KEY
+  // is set. Pricing in hundredths of cents per 1k = ($ per 1M) × 10.
+  {
+    modelId: "claude-opus-4-8",
+    provider: "anthropic",
+    displayName: "Claude Opus 4.8",
+    tierMinimum: "high",
+    costPer1kInput: 50,    // $5.00/M
+    costPer1kOutput: 250,  // $25.00/M
+    maxTokens: 32768,
+    contextWindow: 1000000,
+    supportsTools: true,
+    supportsVision: true,
+    parameterStyle: "max_tokens",
+    enabled: true,
+  },
+  {
+    modelId: "claude-sonnet-4-6",
+    provider: "anthropic",
+    displayName: "Claude Sonnet 4.6",
+    tierMinimum: "normal",
+    costPer1kInput: 30,    // $3.00/M
+    costPer1kOutput: 150,  // $15.00/M
+    maxTokens: 32768,
+    contextWindow: 1000000,
+    supportsTools: true,
+    supportsVision: true,
+    parameterStyle: "max_tokens",
+    enabled: true,
+  },
+  {
+    modelId: "claude-haiku-4-5",
+    provider: "anthropic",
+    displayName: "Claude Haiku 4.5",
+    tierMinimum: "low_compute",
+    costPer1kInput: 10,    // $1.00/M
+    costPer1kOutput: 50,   // $5.00/M
+    maxTokens: 32768,
+    contextWindow: 200000,
+    supportsTools: true,
+    supportsVision: true,
+    parameterStyle: "max_tokens",
+    enabled: true,
+  },
+  {
+    modelId: "claude-fable-5",
+    provider: "anthropic",
+    displayName: "Claude Fable 5",
+    tierMinimum: "high",
+    costPer1kInput: 100,   // $10.00/M (most capable)
+    costPer1kOutput: 500,  // $50.00/M
+    maxTokens: 32768,
+    contextWindow: 1000000,
+    supportsTools: true,
+    supportsVision: true,
+    parameterStyle: "max_tokens",
+    enabled: true,
+  },
 ];
 
 // === Default Routing Matrix ===

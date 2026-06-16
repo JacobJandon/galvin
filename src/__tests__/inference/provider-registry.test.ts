@@ -66,15 +66,17 @@ describe("ProviderRegistry", () => {
     const registry = ProviderRegistry.fromConfig(makeMissingPath());
 
     const providers = registry.getProviders();
-    expect(providers.length).toBe(4);
+    expect(providers.length).toBe(5);
     expect(providers.map((provider) => provider.id)).toEqual([
       "openai",
+      "anthropic",
       "groq",
       "together",
       "local",
     ]);
     expect(providers.find((provider) => provider.id === "openai")?.enabled).toBe(true);
     expect(providers.find((provider) => provider.id === "together")?.enabled).toBe(false);
+    expect(providers.find((provider) => provider.id === "anthropic")?.enabled).toBe(false);
   });
 
   it("fromConfig keeps defaults when JSON is invalid", () => {
@@ -83,7 +85,7 @@ describe("ProviderRegistry", () => {
     fs.writeFileSync(filePath, "{ not json", "utf8");
 
     const registry = ProviderRegistry.fromConfig(filePath);
-    expect(registry.getProviders().length).toBe(4);
+    expect(registry.getProviders().length).toBe(5);
     expect(registry.resolveModel("reasoning").provider.id).toBe("openai");
   });
 
@@ -144,7 +146,7 @@ describe("ProviderRegistry", () => {
     });
 
     const registry = ProviderRegistry.fromConfig(filePath);
-    expect(registry.getProviders().length).toBe(4);
+    expect(registry.getProviders().length).toBe(5);
   });
 
   it("fromConfig uses emergencyStopCredits from config", () => {

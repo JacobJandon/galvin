@@ -115,6 +115,55 @@ const DEFAULT_PROVIDERS: ProviderConfig[] = [
     enabled: true,
   },
   {
+    // Anthropic Claude via its OpenAI-compatible endpoint — the OpenAI SDK works
+    // unchanged. Only active when ANTHROPIC_API_KEY is set (see isProviderActive).
+    id: "anthropic",
+    name: "Anthropic (Claude)",
+    baseUrl: "https://api.anthropic.com/v1",
+    apiKeyEnvVar: "ANTHROPIC_API_KEY",
+    models: [
+      {
+        id: "claude-opus-4-8",
+        tier: "reasoning",
+        contextWindow: 1000000,
+        maxOutputTokens: 32768,
+        costPerInputToken: 5.0,
+        costPerOutputToken: 25.0,
+        supportsTools: true,
+        supportsVision: true,
+        supportsStreaming: true,
+      },
+      {
+        id: "claude-sonnet-4-6",
+        tier: "fast",
+        contextWindow: 1000000,
+        maxOutputTokens: 32768,
+        costPerInputToken: 3.0,
+        costPerOutputToken: 15.0,
+        supportsTools: true,
+        supportsVision: true,
+        supportsStreaming: true,
+      },
+      {
+        id: "claude-haiku-4-5",
+        tier: "cheap",
+        contextWindow: 200000,
+        maxOutputTokens: 32768,
+        costPerInputToken: 1.0,
+        costPerOutputToken: 5.0,
+        supportsTools: true,
+        supportsVision: true,
+        supportsStreaming: true,
+      },
+    ],
+    maxRequestsPerMinute: 1000,
+    maxTokensPerMinute: 2_000_000,
+    priority: 2,
+    // Off by default so it never pollutes auto-routing candidates without a key.
+    // Auto-enabled at runtime when config.anthropicApiKey is set (see agent/loop.ts).
+    enabled: false,
+  },
+  {
     id: "groq",
     name: "Groq",
     baseUrl: "https://api.groq.com/openai/v1",
@@ -396,6 +445,14 @@ export class ProviderRegistry {
 
   enableProvider(id: string): void {
     this.disablements.delete(id);
+  }
+
+  /** Flip a provider's enabled flag (e.g. enable Anthropic once a key is configured). */
+  setEnabled(id: string, enabled: boolean): void {
+    const provider = this.providers.find((candidate) => candidate.id === id);
+    if (provider) {
+      provider.enabled = enabled;
+    }
   }
 
   private getProviderOrderForTier(tier: ModelTier): ProviderConfig[] {

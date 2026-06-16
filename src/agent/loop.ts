@@ -176,6 +176,12 @@ export async function runAgentLoop(
         registry.overrideBaseUrl("openai", process.env.OPENAI_BASE_URL);
       }
 
+      // Anthropic (Claude) is off by default; turn it on once a key is present so
+      // the agent can route to claude-opus-4-8 etc. (set inferenceModel to use it).
+      if (process.env.ANTHROPIC_API_KEY) {
+        registry.setEnabled("anthropic", true);
+      }
+
       const unifiedInference = new UnifiedInferenceClient(registry);
       const agentTracker = new SimpleAgentTracker(db);
       const funding = new SimpleFundingProtocol(conway, identity, db);
