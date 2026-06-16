@@ -88,17 +88,12 @@ async function main(): Promise<void> {
     cmd("--logs [n]",     "Show last N agent turns (default 10, max 100)");
     cmd("--income [days]","Income/expense report (default 30 days)");
     cmd("--tasks",        "List heartbeat tasks and last run times");
-    cmd("--wallet",       "Wallet address + USDC balance");
+    cmd("--wallet [sub]", "Wallet: show · backup [path] · export · import <key>");
     cmd("--fund",         "Show funding QR + wait for USDC deposit (alias: --qr)");
-    cmd("--export-wallet", "Print the private key for OFF-machine backup (keep it safe!)");
-    cmd("--backup-wallet", "Copy the wallet file to a backup [optional path]");
-    cmd("--import-wallet", "Restore a wallet from a 0x private key [--force]");
-    cmd("--trust",        "Show this agent's verifiable trust record (registry V1)");
-    cmd("--honeypot",     "Check if a GitHub repo/bounty is a honeypot <url>");
+    cmd("--trust [sub]",  "Trust record · vc (signed credential) · verify <file>");
+    cmd("--owner [sub]",  "Ownership: prove (challenge) · verify <0x-signature>");
+    cmd("--honeypot <url>", "Check if a GitHub repo/bounty is a honeypot");
     cmd("--bounties",     "List queued bounty candidates");
-    cmd("--verify-vc",    "Verify a Verifiable Credential <file|json>");
-    cmd("--prove-owner",  "Issue an ownership challenge for the owner to sign");
-    cmd("--verify-owner", "Verify the owner's signature <0x-signature>");
     cmd("--memory [q]",   "Search semantic memory for a term");
     cmd("--reset-db",     `${YEL}⚠ Delete DB and start fresh (asks confirmation)${R}`);
     print(`\n  ${DIM}Environment:${R}`);
@@ -266,67 +261,64 @@ async function main(): Promise<void> {
   }
 
   // ─── --wallet ──────────────────────────────────────────────
+  // ─── --wallet [backup [path] | export | import <0x-key> [--force]] ──
   if (args.includes("--wallet")) {
-    const { account } = await getWallet();
-    print(`  ${INFO}  Fetching USDC balance on Base L2 …`);
-    const balance = await getUsdcBalance(account.address as `0x${string}`).catch(() => 0);
-    const lowBalance = balance < 1;
-    boxHeader("Wallet");
-    gap();
-    kv("Address",      account.address);
-    kv("Network",      "Base L2  (mainnet)");
-    kv("USDC Balance", `${lowBalance ? RED : G}$${balance.toFixed(4)}${R}${lowBalance ? `  ${YEL}(low — top up to keep Galvin alive)${R}` : ""}`);
-    gap();
-    process.exit(0);
-  }
-
-  // ─── --backup-wallet [path] ────────────────────────────────
-  if (args.includes("--backup-wallet")) {
-    const i = args.indexOf("--backup-wallet");
-    const dest = args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : undefined;
-    try {
-      const p = backupWallet(dest);
-      print(`  ${OK}  Wallet backed up → ${p}`);
-      print(`  ${YEL}For true safety also run ${B}galvin --export-wallet${R}${YEL} and store the key OFF this machine.${R}`);
-    } catch (e) {
-      print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`);
+    const i = args.indexOf("--wallet");
+    const sub = args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : "";
+    if (sub === "backup") {
+      const dest = args[i + 2] && !args[i + 2].startsWith("--") ? args[i + 2] : undefined;
+      try {
+        print(`  ${OK}  Wallet backed up → ${backupWallet(dest)}`);
+        print(`  ${YEL}For true safety also run ${B}galvin --wallet export${R}${YEL} and store the key OFF this machine.${R}`);
+      } catch (e) { print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`); }
+    } else if (sub === "export") {
+      try {
+        const { address, privateKey } = exportWalletKey();
+        print(`\n  ${YEL}${B}⚠  PRIVATE KEY — anyone with this controls the wallet and its funds.${R}`);
+        print(`  ${YEL}Store it in a password manager / write it down OFF this machine. Never paste it online.${R}\n`);
+        print(`  Address:     ${address}`);
+        print(`  Private key: ${privateKey}\n`);
+      } catch (e) { print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`); }
+    } else if (sub === "import") {
+      const key = args[i + 2];
+      if (!key || key.startsWith("--")) { print(`  ${FAIL}  usage: galvin --wallet import <0x-private-key> [--force]`); process.exit(1); }
+      try { print(`  ${OK}  Wallet imported → ${importWallet(key, { force: args.includes("--force") })}`); }
+      catch (e) { print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`); }
+    } else {
+      const { account } = await getWallet();
+      print(`  ${INFO}  Fetching USDC balance on Base L2 …`);
+      const balance = await getUsdcBalance(account.address as `0x${string}`).catch(() => 0);
+      const lowBalance = balance < 1;
+      boxHeader("Wallet");
+      gap();
+      kv("Address",      account.address);
+      kv("Network",      "Base L2  (mainnet)");
+      kv("USDC Balance", `${lowBalance ? RED : G}$${balance.toFixed(4)}${R}${lowBalance ? `  ${YEL}(low — top up to keep Galvin alive)${R}` : ""}`);
+      print(`  ${DIM}sub-commands: --wallet backup [path] | export | import <key>${R}`);
+      gap();
     }
     process.exit(0);
   }
 
-  // ─── --export-wallet (prints PRIVATE KEY for off-machine backup) ──
-  if (args.includes("--export-wallet")) {
-    try {
-      const { address, privateKey } = exportWalletKey();
-      print(`\n  ${YEL}${B}⚠  PRIVATE KEY — anyone with this controls the wallet and its funds.${R}`);
-      print(`  ${YEL}Store it in a password manager / write it down OFF this machine. Never paste it online or share it.${R}\n`);
-      print(`  Address:     ${address}`);
-      print(`  Private key: ${privateKey}\n`);
-    } catch (e) {
-      print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`);
-    }
-    process.exit(0);
-  }
-
-  // ─── --import-wallet <0x-key> [--force] ────────────────────
-  if (args.includes("--import-wallet")) {
-    const i = args.indexOf("--import-wallet");
-    const key = args[i + 1];
-    if (!key || key.startsWith("--")) {
-      print(`  ${FAIL}  usage: galvin --import-wallet <0x-private-key> [--force]`);
-      process.exit(1);
-    }
-    try {
-      const addr = importWallet(key, { force: args.includes("--force") });
-      print(`  ${OK}  Wallet imported → ${addr}`);
-    } catch (e) {
-      print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`);
-    }
-    process.exit(0);
-  }
-
-  // ─── --trust → this agent's verifiable trust record (registry V1) ──
+  // ─── --trust [vc | verify <file|json>] → trust record / signed credential (registry V1) ──
   if (args.includes("--trust")) {
+    const i = args.indexOf("--trust");
+    const sub = args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : "";
+    if (sub === "verify") {
+      const arg = args[i + 2];
+      if (!arg || arg.startsWith("--")) { print(`  ${FAIL}  usage: galvin --trust verify <file.json | json-string>`); process.exit(1); }
+      const { verifyCredential } = await import("./registry/credential.js");
+      let raw = arg;
+      try { if (fs.existsSync(arg)) raw = fs.readFileSync(arg, "utf8"); } catch { /* json string */ }
+      try {
+        const r = await verifyCredential(JSON.parse(raw));
+        gap();
+        if (r.valid) print(`  ${G}${B}✓ VALID${R}  issued by ${r.issuer}`);
+        else print(`  ${RED}${B}✗ INVALID${R}  ${r.reason}${r.signer ? `  ${DIM}(recovered ${r.signer})${R}` : ""}`);
+        gap();
+      } catch (e) { print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`); }
+      process.exit(0);
+    }
     const config = loadConfig();
     if (!config) { print(`  ${FAIL}  Not configured. Run galvin --setup first.`); process.exit(1); }
     const { buildTrustRecord, verifyTrustRecord } = await import("./registry/trust-record.js");
@@ -344,8 +336,8 @@ async function main(): Promise<void> {
       print(`  ${INFO}  Verifying on-chain (Base)…`);
       rec = await verifyTrustRecord(rec, { easSchemaUid: (config as { easSchemaUid?: string }).easSchemaUid, easNetwork: (config as { easNetwork?: string }).easNetwork });
     }
-    // --vc: emit the record as a wallet-signed, offline-verifiable Verifiable Credential.
-    if (args.includes("--vc")) {
+    // "vc" sub-action or --vc flag → emit a wallet-signed Verifiable Credential.
+    if (sub === "vc" || args.includes("--vc")) {
       const { issueCredential } = await import("./registry/credential.js");
       const vc = await issueCredential(rec as unknown as Record<string, unknown>, account, { types: ["SolvatronTrustRecord"] });
       print(JSON.stringify(vc, null, 2));
@@ -359,6 +351,7 @@ async function main(): Promise<void> {
     kv("Solvency",     `${rec.proofOfSolvency.daysActive}d active · ${rec.proofOfSolvency.turnsRecorded} turns`);
     kv("Work history", `$${rec.proofOfWorkHistory.totalEarnedUsd} earned · ${rec.proofOfWorkHistory.inboundTransactions} tx · ${rec.proofOfWorkHistory.attestations} attestations`);
     if (rec.onChain) kv("On-chain",  `${G}$${rec.onChain.usdcBalance} USDC (verified)${R}`);
+    print(`  ${DIM}sub-commands: --trust vc | --trust verify <file>${R}`);
     gap();
     process.exit(0);
   }
@@ -397,26 +390,26 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // ─── --verify-vc <file|json> → verify any agent's Verifiable Credential ──
-  if (args.includes("--verify-vc")) {
-    const i = args.indexOf("--verify-vc");
-    const arg = args[i + 1];
-    if (!arg || arg.startsWith("--")) { print(`  ${FAIL}  usage: galvin --verify-vc <file.json | json-string>`); process.exit(1); }
-    const { verifyCredential } = await import("./registry/credential.js");
-    let raw = arg;
-    try { if (fs.existsSync(arg)) raw = fs.readFileSync(arg, "utf8"); } catch { /* treat arg as json */ }
-    try {
-      const r = await verifyCredential(JSON.parse(raw));
-      gap();
-      if (r.valid) print(`  ${G}${B}✓ VALID${R}  issued by ${r.issuer}`);
-      else print(`  ${RED}${B}✗ INVALID${R}  ${r.reason}${r.signer ? `  ${DIM}(recovered ${r.signer})${R}` : ""}`);
-      gap();
-    } catch (e) { print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`); }
-    process.exit(0);
-  }
-
-  // ─── --prove-owner → issue an ownership challenge for the owner to sign ──
-  if (args.includes("--prove-owner")) {
+  // ─── --owner [prove | verify <0x-signature>] → ownership proof (registry L3) ──
+  if (args.includes("--owner")) {
+    const i = args.indexOf("--owner");
+    const sub = args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : "";
+    if (sub === "verify") {
+      const sig = args[i + 2];
+      if (!sig || sig.startsWith("--")) { print(`  ${FAIL}  usage: galvin --owner verify <0x-signature>`); process.exit(1); }
+      const { verifyOwnership } = await import("./registry/credential.js");
+      const chPath = path.join(process.env.HOME ?? "", ".galvin", "ownership-challenge.json");
+      if (!fs.existsSync(chPath)) { print(`  ${FAIL}  No pending challenge — run galvin --owner prove first.`); process.exit(1); }
+      try {
+        const r = await verifyOwnership(JSON.parse(fs.readFileSync(chPath, "utf8")), sig);
+        gap();
+        if (r.valid) print(`  ${G}${B}✓ OWNERSHIP PROVEN${R}  owner ${r.owner}`);
+        else print(`  ${RED}${B}✗ NOT PROVEN${R}  ${r.reason}`);
+        gap();
+      } catch (e) { print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`); }
+      process.exit(0);
+    }
+    // default / "prove": issue an ownership challenge for the owner to sign
     const config = loadConfig();
     if (!config) { print(`  ${FAIL}  Not configured.`); process.exit(1); }
     const { account } = await getWallet();
@@ -430,26 +423,8 @@ async function main(): Promise<void> {
     print(`  ${DIM}────────────────────────────────────────${R}`);
     print(ch.statement.split("\n").map((l) => "  " + l).join("\n"));
     print(`  ${DIM}────────────────────────────────────────${R}`);
-    print(`  Then run:  ${G2}galvin --verify-owner <0x-signature>${R}   ${DIM}(challenge saved, expires in 10m)${R}`);
+    print(`  Then run:  ${G2}galvin --owner verify <0x-signature>${R}   ${DIM}(challenge saved, expires in 10m)${R}`);
     gap();
-    process.exit(0);
-  }
-
-  // ─── --verify-owner <signature> → verify the owner's signature ──
-  if (args.includes("--verify-owner")) {
-    const i = args.indexOf("--verify-owner");
-    const sig = args[i + 1];
-    if (!sig || sig.startsWith("--")) { print(`  ${FAIL}  usage: galvin --verify-owner <0x-signature>`); process.exit(1); }
-    const { verifyOwnership } = await import("./registry/credential.js");
-    const chPath = path.join(process.env.HOME ?? "", ".galvin", "ownership-challenge.json");
-    if (!fs.existsSync(chPath)) { print(`  ${FAIL}  No pending challenge — run galvin --prove-owner first.`); process.exit(1); }
-    try {
-      const r = await verifyOwnership(JSON.parse(fs.readFileSync(chPath, "utf8")), sig);
-      gap();
-      if (r.valid) print(`  ${G}${B}✓ OWNERSHIP PROVEN${R}  owner ${r.owner}`);
-      else print(`  ${RED}${B}✗ NOT PROVEN${R}  ${r.reason}`);
-      gap();
-    } catch (e) { print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`); }
     process.exit(0);
   }
 
