@@ -96,6 +96,7 @@ async function main(): Promise<void> {
     cmd("--bounties",     "List queued bounty candidates");
     cmd("--skills [q]",   "Search the skill index (installed + cached marketplace)");
     cmd("--compute",      "Show + self-test the compute backend (local/ssh/…)");
+    cmd("--notify <msg>", "Broadcast a message across configured channels");
     cmd("--memory [q]",   "Search semantic memory for a term");
     cmd("--reset-db",     `${YEL}⚠ Delete DB and start fresh (asks confirmation)${R}`);
     print(`\n  ${DIM}Environment:${R}`);
@@ -469,6 +470,23 @@ async function main(): Promise<void> {
     if (r.exitCode === 0 && r.stdout.includes("galvin-compute-ok")) print(`  ${G}✓ working${R}  (${backend.kind})`);
     else print(`  ${RED}✗ failed${R}  ${String(r.stderr).slice(0, 80)}`);
     print(`  ${DIM}set in galvin.json: "compute": { "backend": "ssh", "ssh": { "host": "user@box" } }${R}`);
+    gap();
+    process.exit(0);
+  }
+
+  // ─── --notify <message> → broadcast across configured channels ──
+  if (args.includes("--notify")) {
+    const i = args.indexOf("--notify");
+    const body = args.slice(i + 1).filter((a) => !a.startsWith("--")).join(" ");
+    if (!body) { print(`  ${FAIL}  usage: galvin --notify <message>`); process.exit(1); }
+    const config = loadConfig();
+    const { buildChannelRegistry } = await import("./channels/channel.js");
+    const chConfigs = ((config as Record<string, unknown> | null)?.channels as never[]) ?? [];
+    const reg = buildChannelRegistry(chConfigs);
+    const results = await reg.broadcast({ body, level: "info" });
+    gap();
+    for (const r of results) print(r.ok ? `  ${G}✓${R} ${r.id}` : `  ${RED}✗${R} ${r.id}  ${DIM}${r.error}${R}`);
+    print(`  ${DIM}add channels in galvin.json: "channels": [{ "type": "webhook", "url": "https://…", "format": "discord" }]${R}`);
     gap();
     process.exit(0);
   }
