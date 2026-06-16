@@ -128,6 +128,44 @@ export async function startGateway(opts: GatewayOptions): Promise<GatewayServer>
         return;
       }
 
+      // ── GET /registry/self.vc → trust record as a wallet-signed Verifiable Credential ──
+      if (method === "GET" && pathname === "/registry/self.vc") {
+        (async () => {
+          try {
+            const { buildTrustRecord, verifyTrustRecord } = await import("../registry/trust-record.js");
+            const { issueCredential } = await import("../registry/credential.js");
+            const { getWallet } = await import("../identity/wallet.js");
+            const home = process.env.HOME ?? "";
+            let createdAt: string | undefined;
+            try {
+              createdAt = JSON.parse(fs.readFileSync(path.join(home, ".galvin", "wallet.json"), "utf8")).createdAt;
+            } catch { /* unknown */ }
+            let constitutionPath: string | undefined;
+            for (const p of [path.join(process.cwd(), "constitution.md"), path.join(home, ".galvin", "constitution.md")]) {
+              if (fs.existsSync(p)) { constitutionPath = p; break; }
+            }
+            let record = buildTrustRecord({
+              rawDb: db.raw,
+              walletAddress: address,
+              chainType: (config as { chainType?: string }).chainType ?? "evm",
+              name: config.name,
+              constitutionPath,
+              createdAt,
+            });
+            record = await verifyTrustRecord(record, {
+              easSchemaUid: (config as { easSchemaUid?: string }).easSchemaUid,
+              easNetwork: (config as { easNetwork?: string }).easNetwork,
+            });
+            const { account } = await getWallet();
+            const vc = await issueCredential(record as unknown as Record<string, unknown>, account, { types: ["SolvatronTrustRecord"] });
+            json(res, vc);
+          } catch (e) {
+            json(res, { error: e instanceof Error ? e.message : String(e) }, 500);
+          }
+        })();
+        return;
+      }
+
       // ── GET /registry/honeypot?url=… → public-good scam/honeypot check (V9) ──
       if (method === "GET" && pathname === "/registry/honeypot") {
         const target = url.searchParams.get("url");

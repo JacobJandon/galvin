@@ -96,6 +96,9 @@ async function main(): Promise<void> {
     cmd("--trust",        "Show this agent's verifiable trust record (registry V1)");
     cmd("--honeypot",     "Check if a GitHub repo/bounty is a honeypot <url>");
     cmd("--bounties",     "List queued bounty candidates");
+    cmd("--verify-vc",    "Verify a Verifiable Credential <file|json>");
+    cmd("--prove-owner",  "Issue an ownership challenge for the owner to sign");
+    cmd("--verify-owner", "Verify the owner's signature <0x-signature>");
     cmd("--memory [q]",   "Search semantic memory for a term");
     cmd("--reset-db",     `${YEL}⚠ Delete DB and start fresh (asks confirmation)${R}`);
     print(`\n  ${DIM}Environment:${R}`);
@@ -341,6 +344,13 @@ async function main(): Promise<void> {
       print(`  ${INFO}  Verifying on-chain (Base)…`);
       rec = await verifyTrustRecord(rec, { easSchemaUid: (config as { easSchemaUid?: string }).easSchemaUid, easNetwork: (config as { easNetwork?: string }).easNetwork });
     }
+    // --vc: emit the record as a wallet-signed, offline-verifiable Verifiable Credential.
+    if (args.includes("--vc")) {
+      const { issueCredential } = await import("./registry/credential.js");
+      const vc = await issueCredential(rec as unknown as Record<string, unknown>, account, { types: ["SolvatronTrustRecord"] });
+      print(JSON.stringify(vc, null, 2));
+      process.exit(0);
+    }
     boxHeader("Trust Record");
     gap();
     kv("Agent",        `${rec.agent.name}  ${rec.agent.address}`);
@@ -384,6 +394,62 @@ async function main(): Promise<void> {
       print(`  ${G2}[${String(r.score).padStart(3)}]${R} $${r.amount_usd}  ${r.repo}#${r.issue_number}  ${G}${r.status}${R}  ${DIM}${String(r.title).slice(0, 48)}${R}`);
     }
     gap();
+    process.exit(0);
+  }
+
+  // ─── --verify-vc <file|json> → verify any agent's Verifiable Credential ──
+  if (args.includes("--verify-vc")) {
+    const i = args.indexOf("--verify-vc");
+    const arg = args[i + 1];
+    if (!arg || arg.startsWith("--")) { print(`  ${FAIL}  usage: galvin --verify-vc <file.json | json-string>`); process.exit(1); }
+    const { verifyCredential } = await import("./registry/credential.js");
+    let raw = arg;
+    try { if (fs.existsSync(arg)) raw = fs.readFileSync(arg, "utf8"); } catch { /* treat arg as json */ }
+    try {
+      const r = await verifyCredential(JSON.parse(raw));
+      gap();
+      if (r.valid) print(`  ${G}${B}✓ VALID${R}  issued by ${r.issuer}`);
+      else print(`  ${RED}${B}✗ INVALID${R}  ${r.reason}${r.signer ? `  ${DIM}(recovered ${r.signer})${R}` : ""}`);
+      gap();
+    } catch (e) { print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`); }
+    process.exit(0);
+  }
+
+  // ─── --prove-owner → issue an ownership challenge for the owner to sign ──
+  if (args.includes("--prove-owner")) {
+    const config = loadConfig();
+    if (!config) { print(`  ${FAIL}  Not configured.`); process.exit(1); }
+    const { account } = await getWallet();
+    const { toDidPkh, issueOwnershipChallenge } = await import("./registry/credential.js");
+    const ownerAddr = (config as { creatorAddress?: string }).creatorAddress;
+    if (!ownerAddr) { print(`  ${FAIL}  No creatorAddress in config — cannot prove ownership.`); process.exit(1); }
+    const ch = issueOwnershipChallenge(toDidPkh(account.address), ownerAddr);
+    fs.writeFileSync(path.join(process.env.HOME ?? "", ".galvin", "ownership-challenge.json"), JSON.stringify(ch, null, 2), { mode: 0o600 });
+    gap();
+    print(`  ${INFO}  Owner ${ownerAddr} must sign this exact message with their wallet:`);
+    print(`  ${DIM}────────────────────────────────────────${R}`);
+    print(ch.statement.split("\n").map((l) => "  " + l).join("\n"));
+    print(`  ${DIM}────────────────────────────────────────${R}`);
+    print(`  Then run:  ${G2}galvin --verify-owner <0x-signature>${R}   ${DIM}(challenge saved, expires in 10m)${R}`);
+    gap();
+    process.exit(0);
+  }
+
+  // ─── --verify-owner <signature> → verify the owner's signature ──
+  if (args.includes("--verify-owner")) {
+    const i = args.indexOf("--verify-owner");
+    const sig = args[i + 1];
+    if (!sig || sig.startsWith("--")) { print(`  ${FAIL}  usage: galvin --verify-owner <0x-signature>`); process.exit(1); }
+    const { verifyOwnership } = await import("./registry/credential.js");
+    const chPath = path.join(process.env.HOME ?? "", ".galvin", "ownership-challenge.json");
+    if (!fs.existsSync(chPath)) { print(`  ${FAIL}  No pending challenge — run galvin --prove-owner first.`); process.exit(1); }
+    try {
+      const r = await verifyOwnership(JSON.parse(fs.readFileSync(chPath, "utf8")), sig);
+      gap();
+      if (r.valid) print(`  ${G}${B}✓ OWNERSHIP PROVEN${R}  owner ${r.owner}`);
+      else print(`  ${RED}${B}✗ NOT PROVEN${R}  ${r.reason}`);
+      gap();
+    } catch (e) { print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`); }
     process.exit(0);
   }
 
