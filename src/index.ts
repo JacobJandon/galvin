@@ -7,11 +7,13 @@
  * the heartbeat daemon + agent loop.
  */
 
-import { getWallet, getGalvinDir } from "./identity/wallet.js";
+import { getWallet, getGalvinDir, backupWallet, exportWalletKey, importWallet } from "./identity/wallet.js";
 import { showBanner, showFundingScreen, updateFundingStatus, stopFundingScreen } from "./setup/banner.js";
 import { getUsdcBalance } from "./conway/x402.js";
 import { awaitFunding } from "./setup/funding-gate.js";
 import { provision, loadApiKeyFromConfig } from "./identity/provision.js";
+import fs from "fs";
+import path from "path";
 import { loadConfig, resolvePath } from "./config.js";
 import { createDatabase } from "./state/database.js";
 import { createConwayClient } from "./conway/client.js";
@@ -88,6 +90,12 @@ async function main(): Promise<void> {
     cmd("--tasks",        "List heartbeat tasks and last run times");
     cmd("--wallet",       "Wallet address + USDC balance");
     cmd("--fund",         "Show funding QR + wait for USDC deposit (alias: --qr)");
+    cmd("--export-wallet", "Print the private key for OFF-machine backup (keep it safe!)");
+    cmd("--backup-wallet", "Copy the wallet file to a backup [optional path]");
+    cmd("--import-wallet", "Restore a wallet from a 0x private key [--force]");
+    cmd("--trust",        "Show this agent's verifiable trust record (registry V1)");
+    cmd("--honeypot",     "Check if a GitHub repo/bounty is a honeypot <url>");
+    cmd("--bounties",     "List queued bounty candidates");
     cmd("--memory [q]",   "Search semantic memory for a term");
     cmd("--reset-db",     `${YEL}⚠ Delete DB and start fresh (asks confirmation)${R}`);
     print(`\n  ${DIM}Environment:${R}`);
@@ -265,6 +273,116 @@ async function main(): Promise<void> {
     kv("Address",      account.address);
     kv("Network",      "Base L2  (mainnet)");
     kv("USDC Balance", `${lowBalance ? RED : G}$${balance.toFixed(4)}${R}${lowBalance ? `  ${YEL}(low — top up to keep Galvin alive)${R}` : ""}`);
+    gap();
+    process.exit(0);
+  }
+
+  // ─── --backup-wallet [path] ────────────────────────────────
+  if (args.includes("--backup-wallet")) {
+    const i = args.indexOf("--backup-wallet");
+    const dest = args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : undefined;
+    try {
+      const p = backupWallet(dest);
+      print(`  ${OK}  Wallet backed up → ${p}`);
+      print(`  ${YEL}For true safety also run ${B}galvin --export-wallet${R}${YEL} and store the key OFF this machine.${R}`);
+    } catch (e) {
+      print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`);
+    }
+    process.exit(0);
+  }
+
+  // ─── --export-wallet (prints PRIVATE KEY for off-machine backup) ──
+  if (args.includes("--export-wallet")) {
+    try {
+      const { address, privateKey } = exportWalletKey();
+      print(`\n  ${YEL}${B}⚠  PRIVATE KEY — anyone with this controls the wallet and its funds.${R}`);
+      print(`  ${YEL}Store it in a password manager / write it down OFF this machine. Never paste it online or share it.${R}\n`);
+      print(`  Address:     ${address}`);
+      print(`  Private key: ${privateKey}\n`);
+    } catch (e) {
+      print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`);
+    }
+    process.exit(0);
+  }
+
+  // ─── --import-wallet <0x-key> [--force] ────────────────────
+  if (args.includes("--import-wallet")) {
+    const i = args.indexOf("--import-wallet");
+    const key = args[i + 1];
+    if (!key || key.startsWith("--")) {
+      print(`  ${FAIL}  usage: galvin --import-wallet <0x-private-key> [--force]`);
+      process.exit(1);
+    }
+    try {
+      const addr = importWallet(key, { force: args.includes("--force") });
+      print(`  ${OK}  Wallet imported → ${addr}`);
+    } catch (e) {
+      print(`  ${FAIL}  ${e instanceof Error ? e.message : String(e)}`);
+    }
+    process.exit(0);
+  }
+
+  // ─── --trust → this agent's verifiable trust record (registry V1) ──
+  if (args.includes("--trust")) {
+    const config = loadConfig();
+    if (!config) { print(`  ${FAIL}  Not configured. Run galvin --setup first.`); process.exit(1); }
+    const { buildTrustRecord, verifyTrustRecord } = await import("./registry/trust-record.js");
+    const { account } = await getWallet();
+    const db = createDatabase(resolvePath(config.dbPath));
+    const home = process.env.HOME ?? "";
+    let createdAt: string | undefined;
+    try { createdAt = JSON.parse(fs.readFileSync(path.join(home, ".galvin", "wallet.json"), "utf8")).createdAt; } catch { /* unknown */ }
+    let consPath: string | undefined;
+    for (const p of [path.join(process.cwd(), "constitution.md"), path.join(home, ".galvin", "constitution.md")]) {
+      if (fs.existsSync(p)) { consPath = p; break; }
+    }
+    let rec = buildTrustRecord({ rawDb: db.raw, walletAddress: account.address, chainType: (config as { chainType?: string }).chainType ?? "evm", name: config.name, constitutionPath: consPath, createdAt });
+    if (!args.includes("--no-verify")) {
+      print(`  ${INFO}  Verifying on-chain (Base)…`);
+      rec = await verifyTrustRecord(rec, { easSchemaUid: (config as { easSchemaUid?: string }).easSchemaUid, easNetwork: (config as { easNetwork?: string }).easNetwork });
+    }
+    boxHeader("Trust Record");
+    gap();
+    kv("Agent",        `${rec.agent.name}  ${rec.agent.address}`);
+    kv("Tier",         rec.tier);
+    kv("Constitution", rec.proofOfConstitution.present ? `${rec.proofOfConstitution.sha256?.slice(0, 16)}…` : `${RED}MISSING${R}`);
+    kv("Solvency",     `${rec.proofOfSolvency.daysActive}d active · ${rec.proofOfSolvency.turnsRecorded} turns`);
+    kv("Work history", `$${rec.proofOfWorkHistory.totalEarnedUsd} earned · ${rec.proofOfWorkHistory.inboundTransactions} tx · ${rec.proofOfWorkHistory.attestations} attestations`);
+    if (rec.onChain) kv("On-chain",  `${G}$${rec.onChain.usdcBalance} USDC (verified)${R}`);
+    gap();
+    process.exit(0);
+  }
+
+  // ─── --honeypot <url> → public-good scam check (registry V9) ──
+  if (args.includes("--honeypot")) {
+    const i = args.indexOf("--honeypot");
+    const url = args[i + 1];
+    if (!url || url.startsWith("--")) { print(`  ${FAIL}  usage: galvin --honeypot <github-url>`); process.exit(1); }
+    const config = loadConfig();
+    const { checkHoneypot } = await import("./registry/honeypot-registry.js");
+    const v = await checkHoneypot(url, { githubToken: (config as { githubToken?: string } | null)?.githubToken });
+    gap();
+    if (v.isHoneypot) print(`  ${RED}${B}⚠ HONEYPOT${R}  ${v.reason}  ${DIM}(${v.repo})${R}`);
+    else if (v.reason) print(`  ${YEL}? cannot assess${R}  ${v.reason}`);
+    else print(`  ${G}${B}✓ looks legit${R}  ${v.repo}  ${DIM}(${v.signals.stars}★, ${v.signals.ageDays}d old)${R}`);
+    gap();
+    process.exit(0);
+  }
+
+  // ─── --bounties → queued bounty candidates ──
+  if (args.includes("--bounties")) {
+    const config = loadConfig();
+    if (!config) { print(`  ${FAIL}  Not configured.`); process.exit(1); }
+    const db = createDatabase(resolvePath(config.dbPath));
+    const rows = db.raw.prepare(
+      "SELECT title, repo, issue_number, amount_usd, score, status FROM bounty_candidates ORDER BY score DESC LIMIT 20",
+    ).all() as Array<{ title: string; repo: string; issue_number: number; amount_usd: number; score: number; status: string }>;
+    boxHeader(`Bounty Candidates  ${rows.length} found`);
+    gap();
+    if (rows.length === 0) print(`  ${DIM}none yet — the bounty_scan heartbeat populates these${R}`);
+    for (const r of rows) {
+      print(`  ${G2}[${String(r.score).padStart(3)}]${R} $${r.amount_usd}  ${r.repo}#${r.issue_number}  ${G}${r.status}${R}  ${DIM}${String(r.title).slice(0, 48)}${R}`);
+    }
     gap();
     process.exit(0);
   }
