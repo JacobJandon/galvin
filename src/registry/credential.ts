@@ -96,6 +96,36 @@ export async function issueCredential(
   return vc;
 }
 
+/**
+ * Issue a credential ABOUT `subjectDid`, signed BY `account` (issuer ≠ subject).
+ * The basis for delegations, mandates, and authority-issued passports.
+ * `verifyCredential` checks the issuer's signature regardless of subject.
+ */
+export async function issueAbout(
+  subjectDid: string,
+  claims: Record<string, unknown>,
+  account: PrivateKeyAccount,
+  opts: { types?: string[]; chainId?: number } = {},
+): Promise<VerifiableCredential> {
+  const issuerDid = toDidPkh(account.address, opts.chainId ?? BASE_CHAIN_ID);
+  const vc: VerifiableCredential = {
+    "@context": ["https://www.w3.org/ns/credentials/v2"],
+    type: ["VerifiableCredential", ...(opts.types ?? ["Credential"])],
+    issuer: issuerDid,
+    validFrom: new Date().toISOString(),
+    credentialSubject: { id: subjectDid, ...claims },
+  };
+  const proofValue = await account.signMessage({ message: canonicalize(vc) });
+  vc.proof = {
+    type: "EthereumEip191Signature2021",
+    created: new Date().toISOString(),
+    verificationMethod: `${issuerDid}#blockchainAccountId`,
+    proofPurpose: "assertionMethod",
+    proofValue,
+  };
+  return vc;
+}
+
 export interface VcVerifyResult {
   valid: boolean;
   issuer: string | null;

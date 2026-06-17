@@ -92,6 +92,7 @@ async function main(): Promise<void> {
     cmd("--fund",         "Show funding QR + wait for USDC deposit (alias: --qr)");
     cmd("--trust [sub]",  "Trust record · vc (signed credential) · verify <file>");
     cmd("--owner [sub]",  "Ownership: prove (challenge) · verify <0x-signature>");
+    cmd("--passport",     "Issue + show this agent's AI passport (AgentPassport VC)");
     cmd("--honeypot <url>", "Check if a GitHub repo/bounty is a honeypot");
     cmd("--bounties",     "List queued bounty candidates");
     cmd("--skills [q]",   "Search the skill index (installed + cached marketplace)");
@@ -488,6 +489,26 @@ async function main(): Promise<void> {
     for (const r of results) print(r.ok ? `  ${G}✓${R} ${r.id}` : `  ${RED}✗${R} ${r.id}  ${DIM}${r.error}${R}`);
     print(`  ${DIM}add channels in galvin.json: "channels": [{ "type": "webhook", "url": "https://…", "format": "discord" }]${R}`);
     gap();
+    process.exit(0);
+  }
+
+  // ─── --passport → issue + show this agent's AI passport (AgentPassport VC) ──
+  if (args.includes("--passport")) {
+    const config = loadConfig();
+    if (!config) { print(`  ${FAIL}  Not configured.`); process.exit(1); }
+    const { account } = await getWallet();
+    const { issueAgentPassport } = await import("./registry/passport.js");
+    const { toDidPkh } = await import("./registry/credential.js");
+    const ownerAddr = (config as { creatorAddress?: string }).creatorAddress;
+    const ownerDid = ownerAddr ? toDidPkh(ownerAddr) : "did:pkh:unknown";
+    const vc = await issueAgentPassport(account, {
+      ownerDid,
+      name: config.name,
+      status: ownerAddr ? "owner-verified" : "unverified",
+    });
+    print(JSON.stringify(vc, null, 2));
+    print(`\n  ${DIM}This is the agent half. The owner (${ownerAddr ?? "set creatorAddress"}) signs the${R}`);
+    print(`  ${DIM}delegation + spend mandate (see --owner prove) — the chain a merchant verifies. See AI_PASSPORT.md.${R}`);
     process.exit(0);
   }
 
