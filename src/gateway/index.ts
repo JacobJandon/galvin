@@ -182,6 +182,36 @@ export async function startGateway(opts: GatewayOptions): Promise<GatewayServer>
         return;
       }
 
+      // ── POST /passport/verify → merchant-side KYO/KYA verification (production) ──
+      // Body: { presentation, challenge, transaction?, requiredOwnerTier?, trustedIssuers? }
+      // 200 + {valid:true} to approve; 402 Payment Required + reasons to decline.
+      if (method === "POST" && pathname === "/passport/verify") {
+        let body = "";
+        req.on("data", (chunk: Buffer) => { body += chunk.toString(); });
+        req.on("end", () => {
+          (async () => {
+            try {
+              const parsed = JSON.parse(body || "{}");
+              if (!parsed.presentation || !parsed.challenge) {
+                badRequest(res, "missing 'presentation' and/or 'challenge'");
+                return;
+              }
+              const { verifyPassportPresentation } = await import("../registry/passport.js");
+              const result = await verifyPassportPresentation(parsed.presentation, {
+                challenge: parsed.challenge,
+                transaction: parsed.transaction,
+                requiredOwnerTier: parsed.requiredOwnerTier,
+                trustedIssuers: parsed.trustedIssuers,
+              });
+              json(res, result, result.valid ? 200 : 402); // 402 Payment Required = declined
+            } catch (e) {
+              json(res, { error: e instanceof Error ? e.message : String(e) }, 500);
+            }
+          })();
+        });
+        return;
+      }
+
       // ── GET /status ───────────────────────────────────
       if (method === "GET" && pathname === "/status") {
         const state = db.getAgentState();
