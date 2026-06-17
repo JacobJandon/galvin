@@ -1,9 +1,11 @@
 /**
  * AI Passport — verified identity an agent presents to act in the world.
  *
- * Two passports (see AI_PASSPORT.md):
- *  - Owner Passport: the verified human/entity (the root of trust + liability).
- *  - Agent Passport: the agent's DID + an owner-signed Delegation + Spend Mandate.
+ * Two passports (see AI_PASSPORT.md), the two halves of agent-commerce trust:
+ *  - KYO — Know Your Owner (Owner Passport): the verified human/entity, the root
+ *    of trust + liability. (Our open answer to KYC, for the agent age.)
+ *  - KYA — Know Your Agent (Agent Passport): the agent's DID + an owner-signed
+ *    Delegation + Spend Mandate.
  *
  * A verifier (e.g. Delta) is handed a Verifiable Presentation — the agent's
  * credentials plus a fresh signature over the verifier's challenge — and runs
@@ -42,7 +44,7 @@ export function issueOwnerPassport(
   ownerDid: string,
   claims: OwnerPassportClaims,
 ): Promise<VerifiableCredential> {
-  return issueAbout(ownerDid, { ...claims }, signer, { types: ["OwnerPassport"] });
+  return issueAbout(ownerDid, { ...claims }, signer, { types: ["OwnerPassport", "KYO"] });
 }
 
 // ─── Delegation (owner → agent) ───────────────────────────────
@@ -99,7 +101,7 @@ export function issueAgentPassport(
   agentAccount: PrivateKeyAccount,
   claims: AgentPassportClaims,
 ): Promise<VerifiableCredential> {
-  return issueCredential({ ...claims }, agentAccount, { types: ["AgentPassport"] });
+  return issueCredential({ ...claims }, agentAccount, { types: ["AgentPassport", "KYA"] });
 }
 
 // ─── Verifiable Presentation ──────────────────────────────────

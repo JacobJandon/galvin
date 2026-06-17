@@ -92,7 +92,7 @@ async function main(): Promise<void> {
     cmd("--fund",         "Show funding QR + wait for USDC deposit (alias: --qr)");
     cmd("--trust [sub]",  "Trust record · vc (signed credential) · verify <file>");
     cmd("--owner [sub]",  "Ownership: prove (challenge) · verify <0x-signature>");
-    cmd("--passport",     "Issue + show this agent's AI passport (AgentPassport VC)");
+    cmd("--passport [demo]", "AI passport: issue this agent's KYA · demo (full KYO/KYA verify)");
     cmd("--honeypot <url>", "Check if a GitHub repo/bounty is a honeypot");
     cmd("--bounties",     "List queued bounty candidates");
     cmd("--skills [q]",   "Search the skill index (installed + cached marketplace)");
@@ -496,6 +496,40 @@ async function main(): Promise<void> {
   if (args.includes("--passport")) {
     const config = loadConfig();
     if (!config) { print(`  ${FAIL}  Not configured.`); process.exit(1); }
+    // --passport demo: run the full KYO→delegation→mandate→KYA→present→verify chain live.
+    if (args[args.indexOf("--passport") + 1] === "demo") {
+      const { generatePrivateKey, privateKeyToAccount } = await import("viem/accounts");
+      const p = await import("./registry/passport.js");
+      const { toDidPkh } = await import("./registry/credential.js");
+      const owner = privateKeyToAccount(generatePrivateKey());
+      const agent = privateKeyToAccount(generatePrivateKey());
+      const kyc = privateKeyToAccount(generatePrivateKey());
+      const ownerDid = toDidPkh(owner.address), agentDid = toDidPkh(agent.address), kycDid = toDidPkh(kyc.address);
+      const ownerPass = await p.issueOwnerPassport(kyc, ownerDid, { displayName: "Demo Owner", verificationTier: "kyc", jurisdiction: "US" });
+      const deleg = await p.issueDelegation(owner, agentDid, { scopes: ["purchase:flights", "pay:bills"] });
+      const mandate = await p.issueSpendMandate(owner, agentDid, { maxPerTxnCents: 100_000, categories: ["flights"] });
+      const agentPass = await p.issueAgentPassport(agent, { ownerDid, name: "Galvin", status: "kyc-verified" });
+      const challenge = `delta-${Date.now()}`;
+      const vp = await p.presentPassport(agent, [agentPass, deleg, mandate, ownerPass], challenge);
+      const opts = { challenge, requiredOwnerTier: "kyc" as const, trustedIssuers: [kycDid] };
+      boxHeader("AI Passport — agent buys a flight at Delta");
+      gap();
+      kv("KYO owner", `${ownerDid.slice(0, 30)}…  ${G}kyc-verified${R}`);
+      kv("KYA agent", `${agentDid.slice(0, 30)}…`);
+      gap();
+      const ok = await p.verifyPassportPresentation(vp, { ...opts, transaction: { amountCents: 50_000, merchant: "Delta", category: "flights" } });
+      print(`  ${ok.valid ? `${G}${B}✓ APPROVED${R}` : `${RED}✗ ${ok.reasons.join("; ")}${R}`}  $500 flight (within mandate, in scope)`);
+      const over = await p.verifyPassportPresentation(vp, { ...opts, transaction: { amountCents: 200_000, merchant: "Delta", category: "flights" } });
+      print(`  ${over.valid ? `${RED}✗ leaked${R}` : `${G}✓ DECLINED${R}`}  $2000 flight  ${DIM}${over.reasons[0]}${R}`);
+      const scope = await p.verifyPassportPresentation(vp, { ...opts, transaction: { amountCents: 5_000, merchant: "Casino", category: "gambling" } });
+      print(`  ${scope.valid ? `${RED}✗ leaked${R}` : `${G}✓ DECLINED${R}`}  gambling  ${DIM}${scope.reasons[0]}${R}`);
+      const replay = await p.verifyPassportPresentation(vp, { ...opts, challenge: "stolen-old-nonce", transaction: { amountCents: 50_000, merchant: "Delta", category: "flights" } });
+      print(`  ${replay.valid ? `${RED}✗ leaked${R}` : `${G}✓ DECLINED${R}`}  replayed presentation  ${DIM}${replay.reasons[0]}${R}`);
+      gap();
+      print(`  ${DIM}offline, no chain call — the merchant verifies cryptographically. See AI_PASSPORT.md${R}`);
+      gap();
+      process.exit(0);
+    }
     const { account } = await getWallet();
     const { issueAgentPassport } = await import("./registry/passport.js");
     const { toDidPkh } = await import("./registry/credential.js");
