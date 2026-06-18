@@ -87,6 +87,7 @@ async function main(): Promise<void> {
     print(`\n  ${DIM}Inspect:${R}`);
     cmd("--logs [n]",     "Show last N agent turns (default 10, max 100)");
     cmd("--debrief",      "Full report: spend by model, tools, earnings, errors, log files");
+    cmd("--confirm",      "Tamper-evident hash-chain fingerprint of the agent's history");
     cmd("--income [days]","Income/expense report (default 30 days)");
     cmd("--tasks",        "List heartbeat tasks and last run times");
     cmd("--wallet [sub]", "Wallet: show · backup [path] · export · import <key>");
@@ -237,6 +238,39 @@ async function main(): Promise<void> {
         for (const f of fileList) print(`    ${DIM}${path.join(logDir, f)}${R}`);
       }
     } catch { /* ignore */ }
+    gap();
+    db.close();
+    process.exit(0);
+  }
+
+  // ─── --confirm → tamper-evident fingerprint of the agent's whole history ──
+  if (args.includes("--confirm")) {
+    const config = loadConfig();
+    if (!config) { print(`  ${FAIL}  Not configured.`); process.exit(1); }
+    const db = createDatabase(resolvePath(config.dbPath));
+    const raw = db.raw as unknown as { prepare: (q: string) => { all: () => Array<Record<string, unknown>> } };
+    const { buildChain, verifyChain, sealBlock, GENESIS } = await import("./registry/hashchain.js");
+    const turns = raw.prepare("SELECT id, timestamp, state, cost_cents FROM turns").all();
+    const inf = raw.prepare("SELECT id, created_at, model, cost_cents, input_tokens, output_tokens FROM inference_costs").all();
+    const tx = raw.prepare("SELECT id, created_at, type, amount_cents FROM transactions").all();
+    const records = [
+      ...turns.map((t) => ({ type: "turn", data: t, timestamp: String(t.timestamp ?? t.created_at ?? "") })),
+      ...inf.map((i) => ({ type: "inference", data: i, timestamp: String(i.created_at ?? "") })),
+      ...tx.map((x) => ({ type: "transaction", data: x, timestamp: String(x.created_at ?? "") })),
+    ].sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    const chain = buildChain(records);
+    const v = verifyChain(chain);
+    const block = sealBlock(0, GENESIS, chain);
+    boxHeader("Confirm", "tamper-evident fingerprint of the agent's history");
+    gap();
+    kv("Records", `${chain.length}  (${turns.length} turns · ${inf.length} inference · ${tx.length} tx)`);
+    kv("Integrity", v.valid ? `${G}✓ intact${R}` : `${RED}✗ broken at #${v.brokenAt} — ${v.reason}${R}`);
+    kv("Head hash", v.head);
+    kv("Block root", block.root);
+    kv("Block hash", block.blockHash);
+    gap();
+    print(`  ${DIM}Anchor the block hash on-chain (EAS / a tx) for an immutable checkpoint —${R}`);
+    print(`  ${DIM}then any later edit to the recorded history changes the head and is provable.${R}`);
     gap();
     db.close();
     process.exit(0);
