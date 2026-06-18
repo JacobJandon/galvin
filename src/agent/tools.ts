@@ -7,6 +7,7 @@
 
 import nodePath from "node:path";
 import { ulid } from "ulid";
+import { classifyType } from "../accounting/classify.js";
 import type {
   GalvinTool,
   ToolContext,
@@ -3810,15 +3811,12 @@ Model: ${ctx.inference.getDefaultModel()}
 
         for (const t of allTxns) {
           const amount = Math.abs(t.amountCents ?? 0);
-          if (t.type === "transfer_in" || t.type === "credit_purchase") {
+          const cls = classifyType(t.type); // honest: funding/credits never count as income
+          if (cls === "earned") {
             incomeCents += amount;
             const src = t.description.slice(0, 40);
             sources[src] = (sources[src] ?? 0) + amount;
-          } else if (
-            t.type === "transfer_out" ||
-            t.type === "inference" ||
-            t.type === "tool_use"
-          ) {
+          } else if (cls === "spent") {
             expenseCents += amount;
           }
         }

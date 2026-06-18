@@ -50,6 +50,7 @@ import {
 import { startGateway, type GatewayServer } from "./gateway/index.js";
 import { getRunningAgent, removeLock, checkAgentLive, probeGateway } from "./gateway/lock.js";
 import { normalizeArgs } from "./cli/commands.js";
+import { classifyType } from "./accounting/classify.js";
 
 const logger = createLogger("main");
 const VERSION = "0.3.0";
@@ -394,11 +395,12 @@ async function main(): Promise<void> {
     const sources: Record<string, number> = {};
     for (const t of txns) {
       const amount = Math.abs(t.amountCents ?? 0);
-      if (t.type === "transfer_in" || t.type === "credit_purchase") {
+      const cls = classifyType(t.type); // honest: only genuine earnings count as income
+      if (cls === "earned") {
         incomeCents += amount;
         const src = t.description.slice(0, 50);
         sources[src] = (sources[src] ?? 0) + amount;
-      } else if (t.type === "transfer_out" || t.type === "inference" || t.type === "tool_use") {
+      } else if (cls === "spent") {
         expenseCents += amount;
       }
     }

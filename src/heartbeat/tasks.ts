@@ -18,6 +18,7 @@ import type {
 import type { HealthMonitor as ColonyHealthMonitor } from "../orchestration/health-monitor.js";
 import { sanitizeInput } from "../agent/injection-defense.js";
 import { getSurvivalTier } from "../conway/credits.js";
+import { isEarnedInflow, isEarned } from "../accounting/classify.js";
 import { createLogger } from "../observability/logger.js";
 import { getMetrics } from "../observability/metrics.js";
 import { AlertEngine, createDefaultAlertRules } from "../observability/alerts.js";
@@ -539,7 +540,7 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
         const amount = Math.max(0, Math.floor(tx.amountCents ?? 0));
         if (amount === 0) continue;
 
-        if (tx.type === "transfer_in" || tx.type === "credit_purchase") {
+        if (isEarned(tx.type)) {
           revenueCents += amount;
           continue;
         }
@@ -838,33 +839,48 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
 
       if (logs.length === 0) return { shouldWake: false };
 
-      let totalUsdcMicro = BigInt(0);
+      // Only THIRD-PARTY-initiated inflows are genuine earnings. Galvin's own
+      // swaps/recovery and owner funding are its own money — never booked as income.
+      const owner = (taskCtx.config as { creatorAddress?: string }).creatorAddress;
+      let earnedMicro = BigInt(0);
+      let earnedCount = 0;
       for (const log of logs) {
         const valueMicro = (log.args as { value?: bigint }).value ?? BigInt(0);
-        totalUsdcMicro += valueMicro;
+        const transferFrom = (log.args as { from?: string }).from;
+        const hash = log.transactionHash;
+        let txInitiator: string | undefined;
+        try {
+          if (hash) txInitiator = (await client.getTransaction({ hash })).from;
+        } catch { /* fall through to address-only checks */ }
+        if (!isEarnedInflow(txInitiator, transferFrom, walletAddress, owner)) {
+          continue; // own-money movement (swap / recovery / funding) — not income
+        }
+        earnedMicro += valueMicro;
+        earnedCount += 1;
         const usdcAmount = Number(valueMicro) / 1_000_000;
-
         taskCtx.db.insertTransaction({
-          id: log.transactionHash ?? `scan_${ulid()}`,
+          id: hash ?? `scan_${ulid()}`,
           type: "transfer_in",
           amountCents: Math.floor(usdcAmount * 100),
-          description: `USDC transfer from ${String((log.args as { from?: string }).from ?? "unknown").slice(0, 10)}... on Base (tx: ${(log.transactionHash ?? "unknown").slice(0, 10)}...)`,
+          description: `Earned: USDC from ${String(transferFrom ?? "unknown").slice(0, 10)}... on Base (tx: ${(hash ?? "unknown").slice(0, 10)}...)`,
           timestamp: new Date().toISOString(),
         });
       }
 
-      const totalUsdc = (Number(totalUsdcMicro) / 1_000_000).toFixed(4);
+      const totalUsdc = (Number(earnedMicro) / 1_000_000).toFixed(4);
       taskCtx.db.setKV("last_income_scan", JSON.stringify({
         timestamp: new Date().toISOString(),
         inboundTransfers: logs.length,
-        totalUsdcReceived: totalUsdc,
+        earnedTransfers: earnedCount,
+        totalUsdcEarned: totalUsdc,
         fromBlock: fromBlock.toString(),
         toBlock: currentBlock.toString(),
       }));
 
+      if (earnedCount === 0) return { shouldWake: false };
       return {
         shouldWake: true,
-        message: `Income detected: ${logs.length} transfer(s), ${totalUsdc} USDC received on Base.`,
+        message: `Income detected: ${earnedCount} earning transfer(s), ${totalUsdc} USDC on Base.`,
       };
     } catch (err: any) {
       logger.warn(`income_scanner failed: ${err?.message}`);
@@ -938,7 +954,7 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
 
       for (const t of allTxns) {
         const amt = Math.abs(t.amountCents ?? 0);
-        if (t.type === "transfer_in" || t.type === "credit_purchase") {
+        if (isEarned(t.type)) {
           income += amt;
         } else if (
           t.type === "inference" ||

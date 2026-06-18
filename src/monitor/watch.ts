@@ -10,6 +10,7 @@
  * This file holds the pure, testable pieces (tail-parse, render, stat rollup).
  * The redraw loop + wallet balance live in the --watch handler in index.ts.
  */
+import { isEarned, isSpent } from "../accounting/classify.js";
 
 export interface LogEntry {
   timestamp?: string;
@@ -133,8 +134,8 @@ export function collectStats(db: RawDb): LiveStats {
 
   const infCents = inference.reduce((s, r) => s + (r.cents || 0), 0);
   const infCalls = inference.reduce((s, r) => s + (r.calls || 0), 0);
-  const earnedCents = transactions.filter((t) => t.type === "transfer_in").reduce((s, t) => s + (t.cents || 0), 0);
-  const spentCents = transactions.filter((t) => t.type !== "transfer_in").reduce((s, t) => s + (t.cents || 0), 0);
+  const earnedCents = transactions.filter((t) => isEarned(t.type)).reduce((s, t) => s + (t.cents || 0), 0);
+  const spentCents = transactions.filter((t) => isSpent(t.type)).reduce((s, t) => s + (t.cents || 0), 0);
   const toolCalls = tools.reduce((s, r) => s + (r.n || 0), 0);
   const toolErrs = tools.reduce((s, r) => s + (r.errs || 0), 0);
 
