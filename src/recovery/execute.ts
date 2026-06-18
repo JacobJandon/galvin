@@ -205,6 +205,36 @@ export interface SwapOptions {
 
 const BASE_RPC = "https://mainnet.base.org";
 
+/** Live Base ETH balance for an address (any wallet). */
+export async function baseEthBalance(address: `0x${string}`, rpcUrl = BASE_RPC): Promise<bigint> {
+  const pub = createPublicClient({ chain: base, transport: http(rpcUrl) });
+  return pub.getBalance({ address });
+}
+
+export interface WaitOptions {
+  rpcUrl?: string;
+  timeoutMs?: number;
+  intervalMs?: number;
+  onTick?: (balanceWei: bigint, elapsedMs: number) => void;
+}
+
+/** Poll Base until the bridged ETH lands (balance reaches minWei) or timeout. */
+export async function waitForBaseEth(account: PrivateKeyAccount, minWei: bigint, opts: WaitOptions = {}): Promise<bigint> {
+  const rpcUrl = opts.rpcUrl ?? BASE_RPC;
+  const pub = createPublicClient({ chain: base, transport: http(rpcUrl) });
+  const timeout = opts.timeoutMs ?? 15 * 60 * 1000;
+  const interval = opts.intervalMs ?? 20_000;
+  const start = Date.now();
+  for (;;) {
+    const bal = await pub.getBalance({ address: account.address }).catch(() => 0n);
+    if (bal >= minWei) return bal;
+    const elapsed = Date.now() - start;
+    if (elapsed >= timeout) throw new Error("timed out waiting for bridged ETH to land on Base");
+    opts.onTick?.(bal, elapsed);
+    await new Promise((r) => setTimeout(r, interval));
+  }
+}
+
 /** Quote + (optionally) execute ETH→USDC on Base. Dry-run unless execute===true. */
 export async function executeSwap(account: PrivateKeyAccount, opts: SwapOptions = {}): Promise<SwapResult> {
   const rpcUrl = opts.rpcUrl ?? BASE_RPC;

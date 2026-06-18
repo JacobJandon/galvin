@@ -654,52 +654,86 @@ async function main(): Promise<void> {
     const s = summarize(bals);
     gap();
     if (s.hasMisdirected) {
-      print(`  ${YEL}${B}Misdirected funds found.${R}`);
       const doExecute = args.includes("--execute");
       const mainnetEth = s.misdirected.find((b) => b.chain === "Ethereum" && b.asset === "ETH");
       const baseEth = s.misdirected.find((b) => b.chain === "Base" && b.asset === "ETH");
-      const { executeBridge, executeSwap, fmtEth } = await import("./recovery/execute.js");
+      const { executeBridge, executeSwap, waitForBaseEth, baseEthBalance, fmtEth } = await import("./recovery/execute.js");
 
-      // Leg 1 — bridge mainnet ETH → Base (the hard cross-chain half).
-      if (mainnetEth) {
+      if (!doExecute) {
+        // ── Preview: show exactly what --execute will do, end to end. Nothing moves. ──
+        print(`  ${YEL}${B}Misdirected funds found.${R}  ${DIM}Preview — nothing is moved.${R}`);
+        if (mainnetEth) {
+          gap();
+          try {
+            const r = await executeBridge(account, { execute: false });
+            print(`  ${B}1. Bridge${R}  ETH mainnet → Base (same address, canonical bridge, no third party):`);
+            print(`     ${G}${fmtEth(r.valueWei)} ETH${R} → Base  ${DIM}(reserve ~${fmtEth(r.balanceWei - r.valueWei)} ETH for gas)${R}`);
+          } catch (e) {
+            print(`  ${RED}1. Bridge unavailable:${R} ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+        if (baseEth) {
+          gap();
+          try {
+            const r = await executeSwap(account, { execute: false });
+            print(`  ${B}${mainnetEth ? "2" : "1"}. Swap${R}  ETH → USDC on Base (Uniswap, slippage-protected):`);
+            print(`     in ${G}${fmtEth(r.amountInWei)} ETH${R} → ${G}~${r.expectedUsdc.toFixed(2)} USDC${R}  ${DIM}(min ${r.minUsdc.toFixed(2)} @ ${(r.slippageBps / 100).toFixed(1)}%)${R}`);
+          } catch (e) {
+            print(`  ${RED}swap quote unavailable:${R} ${e instanceof Error ? e.message : String(e)}`);
+          }
+        } else if (mainnetEth) {
+          gap();
+          print(`  ${B}2. Swap${R}  the bridged ETH → USDC on Base (auto-quoted once it lands).`);
+        }
         gap();
-        try {
-          const r = await executeBridge(account, { execute: doExecute });
-          if (r.dryRun) {
-            print(`  ${B}Auto-bridge ready${R}  (ETH mainnet → Base, same address, no third party):`);
-            print(`    amount:  ${G}${fmtEth(r.valueWei)} ETH${R}  ${DIM}(reserving ~${fmtEth(r.balanceWei - r.valueWei)} ETH for gas · ~${r.gas} units)${R}`);
-            print(`  ${YEL}${B}Run  galvin --recover --execute${R}${YEL} to broadcast (irreversible) — lands on Base in ~a few min.${R}`);
-          } else {
+        if (!mainnetEth && !baseEth) {
+          print(`  ${DIM}Recover via galvin --wallet export → bridge/swap.${R}`);
+        } else {
+          print(`  ${YEL}${B}Run  galvin --recover --execute${R}${YEL} — does the whole recovery hands-off:`);
+          print(`  ${YEL}bridge → wait for Base → swap → funded. No further steps.${R}`);
+        }
+      } else {
+        // ── Full auto: bridge → wait for it to land → swap → funded. One command. ──
+        print(`  ${YEL}${B}Auto-recovering — hands-off.${R}  ${DIM}broadcasting real, irreversible transactions${R}`);
+        let swapReady = !!baseEth;
+        if (mainnetEth) {
+          gap();
+          try {
+            const baselineWei = await baseEthBalance(account.address);
+            const r = await executeBridge(account, { execute: true });
             print(`  ${G}${B}✓ Bridge broadcast${R}  ${DIM}${r.hash}${R}`);
-            print(`    ${fmtEth(r.valueWei)} ETH → Base (~a few min). Re-run ${B}--recover --execute${R} to swap to USDC.`);
+            print(`    ${fmtEth(r.valueWei)} ETH → Base. Waiting for it to land (~a few min)…`);
+            const target = baselineWei + (r.valueWei * 9n) / 10n; // ~90% credited (bridge fee margin)
+            const landed = await waitForBaseEth(account, target, {
+              onTick: (bal, el) => print(`    ${DIM}…${Math.round(el / 1000)}s — Base balance ${fmtEth(bal)} ETH${R}`),
+            });
+            print(`  ${G}${B}✓ Landed on Base${R}  ${fmtEth(landed)} ETH`);
+            swapReady = true;
+          } catch (e) {
+            print(`  ${RED}bridge/landing issue:${R} ${e instanceof Error ? e.message : String(e)}`);
+            print(`  ${DIM}Bridge may still be in flight — re-run  galvin --recover --execute  shortly to finish.${R}`);
+            gap();
+            process.exit(0);
           }
-        } catch (e) {
-          print(`  ${RED}auto-bridge unavailable:${R} ${e instanceof Error ? e.message : String(e)}`);
-          print(`  ${DIM}Manual: galvin --wallet export → MetaMask → bridge.base.org → swap to USDC.${R}`);
         }
-      }
-
-      // Leg 2 — swap ETH on Base → USDC (the funding asset), with slippage protection.
-      if (baseEth) {
+        if (swapReady) {
+          gap();
+          try {
+            const r = await executeSwap(account, { execute: true });
+            print(`  ${G}${B}✓ Swap broadcast${R}  ${DIM}${r.hash}${R}`);
+            print(`    ${fmtEth(r.amountInWei)} ETH → ~${r.expectedUsdc.toFixed(2)} USDC on Base.`);
+          } catch (e) {
+            print(`  ${RED}swap issue:${R} ${e instanceof Error ? e.message : String(e)}`);
+            print(`  ${DIM}ETH is safe on Base — re-run  galvin --recover --execute  to swap.${R}`);
+          }
+        }
+        // ── Confirm final funded state directly from chain ──
         gap();
         try {
-          const r = await executeSwap(account, { execute: doExecute });
-          if (r.dryRun) {
-            print(`  ${B}Auto-swap ready${R}  (ETH → USDC on Base, Uniswap):`);
-            print(`    in:  ${G}${fmtEth(r.amountInWei)} ETH${R}  →  ${G}~${r.expectedUsdc.toFixed(2)} USDC${R}  ${DIM}(min ${r.minUsdc.toFixed(2)} @ ${(r.slippageBps / 100).toFixed(1)}% slippage)${R}`);
-            print(`  ${YEL}${B}Run  galvin --recover --execute${R}${YEL} to swap (irreversible).${R}`);
-          } else {
-            print(`  ${G}${B}✓ Swap broadcast${R}  ${DIM}${r.hash}${R}`);
-            print(`    ${fmtEth(r.amountInWei)} ETH → ~${r.expectedUsdc.toFixed(2)} USDC on Base. Re-run --recover to confirm funded.`);
-          }
-        } catch (e) {
-          print(`  ${RED}auto-swap unavailable:${R} ${e instanceof Error ? e.message : String(e)}`);
-          print(`  ${DIM}Manual: swap ETH→USDC on Base at app.uniswap.org.${R}`);
-        }
-      }
-
-      if (!mainnetEth && !baseEth) {
-        print(`  ${DIM}Recover each per the step above (galvin --wallet export → bridge/swap).${R}`);
+          const after = summarize(await scanWallet(account.address));
+          if (after.usableUsdc >= 5) print(`  ${G}${B}✓ Funded${R}  ${after.usableUsdc.toFixed(2)} USDC on Base — ready to run.`);
+          else print(`  ${YEL}USDC on Base: ${after.usableUsdc.toFixed(2)}${R}  ${DIM}(swap may still be confirming — re-run --recover to verify)${R}`);
+        } catch { /* network blip — funds are on-chain regardless */ }
       }
     } else if (s.usableUsdc >= 5) {
       print(`  ${G}${B}✓ Funded${R}  ${s.usableUsdc.toFixed(2)} USDC on Base — ready to run.`);
