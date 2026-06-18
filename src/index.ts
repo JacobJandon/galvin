@@ -86,6 +86,7 @@ async function main(): Promise<void> {
     cmd("--provision",    "Provision Conway API key (SIWE sign-in)");
     print(`\n  ${DIM}Inspect:${R}`);
     cmd("--logs [n]",     "Show last N agent turns (default 10, max 100)");
+    cmd("--watch",        "Live monitor: watch Galvin work in real time (--once for one frame)");
     cmd("--debrief",      "Full report: spend by model, tools, earnings, errors, log files");
     cmd("--confirm",      "Tamper-evident hash-chain fingerprint of the agent's history");
     cmd("--income [days]","Income/expense report (default 30 days)");
@@ -242,6 +243,99 @@ async function main(): Promise<void> {
     gap();
     db.close();
     process.exit(0);
+  }
+
+  // ─── --watch → live monitor: watch Galvin work in real time (DB ledger + flight recorder) ──
+  if (args.includes("--watch") || args.includes("--live") || args.includes("--monitor")) {
+    const config = loadConfig();
+    if (!config) { print(`  ${FAIL}  Not configured.`); process.exit(1); }
+    const { collectStats, parseTailLines, renderEntry, isActive } = await import("./monitor/watch.js");
+    type RawDb = import("./monitor/watch.js").RawDb;
+    const noColor = !!process.env.GALVIN_NO_COLOR;
+    const db = createDatabase(resolvePath(config.dbPath));
+    const raw = db.raw as unknown as RawDb;
+    const { account } = await getWallet();
+    const logDir = path.join(getGalvinDir(), "logs");
+    const usd = (c: number) => `$${((c || 0) / 100).toFixed(4)}`;
+    const FEED = 12;
+
+    // Wallet balance (USDC on Base): refresh async every 20s — never block the redraw.
+    const bal = { usdc: null as number | null, at: 0, inFlight: false };
+    const refreshBal = () => {
+      if (bal.inFlight || Date.now() - bal.at < 20_000) return;
+      bal.inFlight = true;
+      import("./recovery/scanner.js")
+        .then(async ({ scanWallet, summarize }) => {
+          try { bal.usdc = summarize(await scanWallet(account.address)).usableUsdc; } catch { /* keep last */ }
+          bal.at = Date.now(); bal.inFlight = false;
+        })
+        .catch(() => { bal.inFlight = false; });
+    };
+
+    const newestLog = (): string | null => {
+      try {
+        const files = fs.existsSync(logDir) ? fs.readdirSync(logDir).filter((f) => /^run-.*\.jsonl$/.test(f)).sort() : [];
+        return files.length ? path.join(logDir, files[files.length - 1]!) : null;
+      } catch { return null; }
+    };
+    const readTail = (file: string): { entries: ReturnType<typeof parseTailLines>; mtimeMs: number } => {
+      try {
+        const st = fs.statSync(file);
+        const cap = Math.min(st.size, 131072);
+        const fd = fs.openSync(file, "r");
+        const buf = Buffer.alloc(cap);
+        fs.readSync(fd, buf, 0, cap, Math.max(0, st.size - cap));
+        fs.closeSync(fd);
+        return { entries: parseTailLines(buf.toString("utf8"), FEED), mtimeMs: st.mtimeMs };
+      } catch { return { entries: [], mtimeMs: 0 }; }
+    };
+
+    const draw = () => {
+      refreshBal();
+      let s: ReturnType<typeof collectStats> | null = null;
+      try { s = collectStats(raw); } catch { /* ledger not ready */ }
+      const file = newestLog();
+      const tail = file ? readTail(file) : { entries: [], mtimeMs: 0 };
+      const live = file ? isActive(tail.mtimeMs, Date.now()) : false;
+
+      const out: string[] = [""];
+      const dot = live ? `${G}●${R}` : `${DIM}○${R}`;
+      out.push(`  ${B}${G}GALVIN${R}  ${DIM}live monitor${R}   ${dot} ${live ? `${G}RUNNING${R}` : `${DIM}idle${R}`}   ${DIM}${shortAddr(account.address)}${R}   ${DIM}${new Date().toLocaleTimeString()}${R}`);
+      out.push(`  ${GR}${"─".repeat(74)}${R}`);
+      const balStr = bal.usdc == null ? `${DIM}…${R}` : `${G}$${bal.usdc.toFixed(2)}${R}`;
+      if (s) {
+        out.push(`  ${B}Balance${R} ${balStr}    ${B}Spent${R} ${YEL}${usd(s.infCents + s.spentCents)}${R}    ${B}Earned${R} ${s.earnedCents > 0 ? G : DIM}${usd(s.earnedCents)}${R}`);
+        out.push(`  ${B}Turns${R} ${s.turns}    ${B}Inference${R} ${s.infCalls} calls    ${B}Tools${R} ${s.toolCalls}${s.toolErrs ? `  ${RED}${s.toolErrs} err${R}` : ""}`);
+        if (s.inference.length) {
+          out.push(`  ${DIM}spend by model:${R}`);
+          for (const m of s.inference.slice(0, 4)) out.push(`    ${m.model.padEnd(20)} ${String(m.calls).padStart(4)}× ${String(m.tokens).padStart(8)} tok  ${usd(m.cents)}`);
+        }
+      } else {
+        out.push(`  ${DIM}ledger not ready yet${R}`);
+      }
+      out.push(`  ${GR}${"─".repeat(74)}${R}`);
+      out.push(`  ${B}Live feed${R}  ${DIM}${file ? path.basename(file) : "waiting for a run — start one with: galvin --run"}${R}`);
+      if (tail.entries.length === 0) out.push(`    ${DIM}no events yet…${R}`);
+      for (const e of tail.entries) out.push(`  ${renderEntry(e, { color: !noColor })}`);
+      out.push("");
+      out.push(`  ${DIM}refreshing every 1s · Ctrl-C to exit${R}`);
+
+      process.stdout.write("\x1b[2J\x1b[3J\x1b[H" + out.join("\n") + "\n");
+    };
+
+    if (args.includes("--once")) {
+      try {
+        const { scanWallet, summarize } = await import("./recovery/scanner.js");
+        bal.usdc = summarize(await scanWallet(account.address)).usableUsdc; bal.at = Date.now();
+      } catch { /* network blip — show last/none */ }
+      draw(); db.close(); process.exit(0);
+    }
+    draw();
+    const timer = setInterval(draw, 1000);
+    const stop = () => { clearInterval(timer); try { db.close(); } catch { /* */ } process.stdout.write("\x1b[0m\n"); process.exit(0); };
+    process.on("SIGINT", stop);
+    process.on("SIGTERM", stop);
+    return; // stay alive on the interval (Ctrl-C exits)
   }
 
   // ─── --confirm → tamper-evident fingerprint of the agent's whole history ──
