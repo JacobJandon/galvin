@@ -203,29 +203,30 @@ export const STATIC_MODEL_BASELINE: Omit<ModelEntry, "lastSeen" | "createdAt" | 
 // Maps (tier, taskType) -> ModelPreference with candidate models
 
 export const DEFAULT_ROUTING_MATRIX: RoutingMatrix = {
-  // Models available on Conway's credits endpoint (api.conway.tech). gpt-5.2 is the
-  // best general model there; gpt-5-mini for cheap tiers. All route to Conway once
-  // no direct OpenAI key is set. (o3 is also available for max reasoning at ~5× cost.)
+  // Best model per tier: Claude (claude-opus-4-8 etc.) routes directly to
+  // api.anthropic.com when an Anthropic key is set; gpt-5.2/gpt-5-mini are kept as
+  // fallbacks (Conway credits endpoint, when its upstream is healthy). If a model
+  // is unsupported on the active backend the router fails over to the next one.
   high: {
-    agent_turn: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 8192, ceilingCents: -1 },
-    heartbeat_triage: { candidates: ["gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
-    safety_check: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 20 },
-    summarization: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 15 },
-    planning: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 8192, ceilingCents: -1 },
+    agent_turn: { candidates: ["claude-opus-4-8", "gpt-5.2", "gpt-5-mini"], maxTokens: 8192, ceilingCents: -1 },
+    heartbeat_triage: { candidates: ["claude-haiku-4-5", "gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
+    safety_check: { candidates: ["claude-opus-4-8", "gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 20 },
+    summarization: { candidates: ["claude-sonnet-4-6", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 15 },
+    planning: { candidates: ["claude-opus-4-8", "gpt-5.2", "gpt-5-mini"], maxTokens: 8192, ceilingCents: -1 },
   },
   normal: {
-    agent_turn: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: -1 },
-    heartbeat_triage: { candidates: ["gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
-    safety_check: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 10 },
-    summarization: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 10 },
-    planning: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: -1 },
+    agent_turn: { candidates: ["claude-opus-4-8", "gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: -1 },
+    heartbeat_triage: { candidates: ["claude-haiku-4-5", "gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
+    safety_check: { candidates: ["claude-sonnet-4-6", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 10 },
+    summarization: { candidates: ["claude-sonnet-4-6", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 10 },
+    planning: { candidates: ["claude-opus-4-8", "gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: -1 },
   },
   low_compute: {
-    agent_turn: { candidates: ["gpt-5-mini"], maxTokens: 4096, ceilingCents: 10 },
-    heartbeat_triage: { candidates: ["gpt-5-mini"], maxTokens: 1024, ceilingCents: 2 },
-    safety_check: { candidates: ["gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
-    summarization: { candidates: ["gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
-    planning: { candidates: ["gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
+    agent_turn: { candidates: ["claude-haiku-4-5", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 10 },
+    heartbeat_triage: { candidates: ["claude-haiku-4-5", "gpt-5-mini"], maxTokens: 1024, ceilingCents: 2 },
+    safety_check: { candidates: ["claude-haiku-4-5", "gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
+    summarization: { candidates: ["claude-haiku-4-5", "gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
+    planning: { candidates: ["claude-haiku-4-5", "gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
   },
   critical: {
     agent_turn: { candidates: ["gpt-5-mini"], maxTokens: 2048, ceilingCents: 3 },

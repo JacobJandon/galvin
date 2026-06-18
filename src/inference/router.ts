@@ -135,7 +135,7 @@ export class InferenceRouter {
         const latencyMs = Date.now() - startTime;
         const isRetryable =
           error?.name === "AbortError" ||
-          /rate.?limit|429|503|overloaded|timeout|service.?unavailable/i.test(
+          /rate.?limit|429|503|overloaded|timeout|service.?unavailable|unsupported model|only priced models/i.test(
             error?.message ?? "",
           );
         const hasNextCandidate = allCandidates.indexOf(candidate) < allCandidates.length - 1;
