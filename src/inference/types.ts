@@ -191,18 +191,27 @@ export const STATIC_MODEL_BASELINE: Omit<ModelEntry, "lastSeen" | "createdAt" | 
     parameterStyle: "max_tokens",
     enabled: true,
   },
+  // NOTE: Conway's credits endpoint (api.conway.tech) serves only GPT/O models —
+  // Claude is available solely on Conway's separate x402 endpoint
+  // (inference.conway.tech), which the agent's credits-based inference path does
+  // not use. So the best model Galvin can run on its funded credits is gpt-5.2
+  // (o3 for max reasoning, ~5× the cost). Claude would require wiring the x402
+  // inference path — tracked as a follow-up, not faked here.
 ];
 
 // === Default Routing Matrix ===
 // Maps (tier, taskType) -> ModelPreference with candidate models
 
 export const DEFAULT_ROUTING_MATRIX: RoutingMatrix = {
+  // Models available on Conway's credits endpoint (api.conway.tech). gpt-5.2 is the
+  // best general model there; gpt-5-mini for cheap tiers. All route to Conway once
+  // no direct OpenAI key is set. (o3 is also available for max reasoning at ~5× cost.)
   high: {
-    agent_turn: { candidates: ["gpt-5.2", "gpt-5.3"], maxTokens: 8192, ceilingCents: -1 },
+    agent_turn: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 8192, ceilingCents: -1 },
     heartbeat_triage: { candidates: ["gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
-    safety_check: { candidates: ["gpt-5.2", "gpt-5.3"], maxTokens: 4096, ceilingCents: 20 },
+    safety_check: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 20 },
     summarization: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 15 },
-    planning: { candidates: ["gpt-5.2", "gpt-5.3"], maxTokens: 8192, ceilingCents: -1 },
+    planning: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 8192, ceilingCents: -1 },
   },
   normal: {
     agent_turn: { candidates: ["gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: -1 },
