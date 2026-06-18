@@ -107,3 +107,133 @@ export async function executeBridge(account: PrivateKeyAccount, opts: BridgeOpti
 export function fmtEth(wei: bigint): string {
   return (Number(wei) / 1e18).toFixed(8);
 }
+
+// ─── Swap ETH → USDC on Base (the second leg) ─────────────────
+import { base } from "viem/chains";
+
+const BASE_ROUTER = "0x2626664c2603336E57B271c5C0b26F421741e481"; // Uniswap SwapRouter02
+const BASE_QUOTER = "0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a"; // Uniswap QuoterV2
+const WETH_BASE = "0x4200000000000000000000000000000000000006";
+const USDC_BASE = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+const POOL_FEE = 500; // 0.05% ETH/USDC pool (deepest on Base)
+
+const QUOTER_ABI = [
+  {
+    type: "function",
+    name: "quoteExactInputSingle",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "params",
+        type: "tuple",
+        components: [
+          { name: "tokenIn", type: "address" },
+          { name: "tokenOut", type: "address" },
+          { name: "amountIn", type: "uint256" },
+          { name: "fee", type: "uint24" },
+          { name: "sqrtPriceLimitX96", type: "uint160" },
+        ],
+      },
+    ],
+    outputs: [
+      { name: "amountOut", type: "uint256" },
+      { name: "sqrtPriceX96After", type: "uint160" },
+      { name: "initializedTicksCrossed", type: "uint32" },
+      { name: "gasEstimate", type: "uint256" },
+    ],
+  },
+] as const;
+
+const ROUTER_ABI = [
+  {
+    type: "function",
+    name: "exactInputSingle",
+    stateMutability: "payable",
+    inputs: [
+      {
+        name: "params",
+        type: "tuple",
+        components: [
+          { name: "tokenIn", type: "address" },
+          { name: "tokenOut", type: "address" },
+          { name: "fee", type: "uint24" },
+          { name: "recipient", type: "address" },
+          { name: "amountIn", type: "uint256" },
+          { name: "amountOutMinimum", type: "uint256" },
+          { name: "sqrtPriceLimitX96", type: "uint160" },
+        ],
+      },
+    ],
+    outputs: [{ name: "amountOut", type: "uint256" }],
+  },
+] as const;
+
+/** Pure: apply slippage to a quoted output (bps = basis points, 100 = 1%). */
+export function minOut(amountOut: bigint, slippageBps: number): bigint {
+  return (amountOut * BigInt(10_000 - slippageBps)) / 10_000n;
+}
+
+/** Build the Uniswap exactInputSingle tx (pure — testable without network). */
+export function buildSwapTx(account: `0x${string}`, amountIn: bigint, amountOutMinimum: bigint): BridgeTx {
+  return {
+    to: BASE_ROUTER as `0x${string}`,
+    value: amountIn,
+    data: encodeFunctionData({
+      abi: ROUTER_ABI,
+      functionName: "exactInputSingle",
+      args: [{ tokenIn: WETH_BASE, tokenOut: USDC_BASE, fee: POOL_FEE, recipient: account, amountIn, amountOutMinimum, sqrtPriceLimitX96: 0n }],
+    }),
+  };
+}
+
+export interface SwapResult {
+  dryRun: boolean;
+  balanceWei: bigint;
+  amountInWei: bigint;
+  expectedUsdc: number;
+  minUsdc: number;
+  slippageBps: number;
+  hash?: `0x${string}`;
+}
+
+export interface SwapOptions {
+  rpcUrl?: string;
+  execute?: boolean;
+  slippageBps?: number; // default 100 = 1%
+  gasReserveWei?: bigint;
+}
+
+const BASE_RPC = "https://mainnet.base.org";
+
+/** Quote + (optionally) execute ETH→USDC on Base. Dry-run unless execute===true. */
+export async function executeSwap(account: PrivateKeyAccount, opts: SwapOptions = {}): Promise<SwapResult> {
+  const rpcUrl = opts.rpcUrl ?? BASE_RPC;
+  const slippageBps = opts.slippageBps ?? 100;
+  const pub = createPublicClient({ chain: base, transport: http(rpcUrl) });
+
+  const balanceWei = await pub.getBalance({ address: account.address });
+  const gasReserve = opts.gasReserveWei ?? parseEther("0.0001"); // Base gas is cheap
+  if (balanceWei <= gasReserve) throw new Error("not enough ETH on Base to swap (after gas reserve)");
+  const amountInWei = balanceWei - gasReserve;
+
+  const { result } = await pub.simulateContract({
+    address: BASE_QUOTER as `0x${string}`,
+    abi: QUOTER_ABI,
+    functionName: "quoteExactInputSingle",
+    args: [{ tokenIn: WETH_BASE, tokenOut: USDC_BASE, amountIn: amountInWei, fee: POOL_FEE, sqrtPriceLimitX96: 0n }],
+    account,
+  });
+  const amountOut = result[0] as bigint;
+  const amountOutMinimum = minOut(amountOut, slippageBps);
+  const expectedUsdc = Number(amountOut) / 1e6;
+  const minUsdc = Number(amountOutMinimum) / 1e6;
+
+  if (!opts.execute) {
+    return { dryRun: true, balanceWei, amountInWei, expectedUsdc, minUsdc, slippageBps };
+  }
+
+  const tx = buildSwapTx(account.address, amountInWei, amountOutMinimum);
+  const wallet = createWalletClient({ account, chain: base, transport: http(rpcUrl) });
+  const hash = await wallet.sendTransaction({ to: tx.to, value: tx.value, data: tx.data });
+  return { dryRun: false, balanceWei, amountInWei, expectedUsdc, minUsdc, slippageBps, hash };
+}

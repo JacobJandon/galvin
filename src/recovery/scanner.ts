@@ -38,7 +38,7 @@ export const CHAINS: ChainSpec[] = [
 ];
 
 export const MINIMUM_USDC = 5; // funding floor (matches the funding gate)
-const ETH_DUST = 0.0005; // ~$1-2; below this, recovering costs more than it's worth
+const ETH_DUST = 0.0012; // ~$3-4; below this, recovery gas costs more than it's worth
 const USDC_DUST = 1;
 
 export interface AssetBalance {
