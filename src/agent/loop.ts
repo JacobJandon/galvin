@@ -524,6 +524,16 @@ export async function runAgentLoop(
               });
               if (topupResult?.success) {
                 log(config, `[AUTO-TOPUP] Bought $${topupResult.amountUsd} credits from USDC mid-loop`);
+                // Record the USDC that left the wallet to buy credits (honest spend).
+                try {
+                  db.insertTransaction({
+                    id: `topup_${ulid()}`,
+                    type: "credit_purchase",
+                    amountCents: Math.round((topupResult.amountUsd ?? 0) * 100),
+                    description: `Bought $${topupResult.amountUsd} Conway credits from USDC`,
+                    timestamp: new Date().toISOString(),
+                  });
+                } catch { /* non-fatal */ }
                 // Re-fetch financial state after topup so the rest of
                 // the turn sees the updated balance.
                 financial = await getFinancialState(conway, identity.address, db);

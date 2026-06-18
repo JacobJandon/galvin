@@ -314,7 +314,7 @@ async function main(): Promise<void> {
       out.push(`  ${GR}${"─".repeat(74)}${R}`);
       const balStr = bal.usdc == null ? `${DIM}…${R}` : `${G}$${bal.usdc.toFixed(2)}${R}`;
       if (s) {
-        out.push(`  ${B}Balance${R} ${balStr}    ${B}Spent${R} ${YEL}${usd(s.infCents + s.spentCents)}${R}    ${B}Earned${R} ${s.earnedCents > 0 ? G : DIM}${usd(s.earnedCents)}${R}`);
+        out.push(`  ${B}Balance${R} ${balStr}    ${B}Spent${R} ${YEL}${usd(s.spentCents)}${R}    ${B}Earned${R} ${s.earnedCents > 0 ? G : DIM}${usd(s.earnedCents)}${R}    ${DIM}inference(credits) ${usd(s.infCents)}${R}`);
         out.push(`  ${B}Turns${R} ${s.turns}    ${B}Inference${R} ${s.infCalls} calls    ${B}Tools${R} ${s.toolCalls}${s.toolErrs ? `  ${RED}${s.toolErrs} err${R}` : ""}`);
         if (s.inference.length) {
           out.push(`  ${DIM}spend by model:${R}`);
@@ -1605,6 +1605,16 @@ async function run(): Promise<void> {
             logger.info(
               `[${new Date().toISOString()}] Bootstrap topup: +$${topupResult.amountUsd} credits from USDC`,
             );
+            // Record the USDC spent buying credits (honest spend tracking).
+            try {
+              db.insertTransaction({
+                id: `topup_${randomUUID()}`,
+                type: "credit_purchase",
+                amountCents: Math.round((topupResult.amountUsd ?? 0) * 100),
+                description: `Bought $${topupResult.amountUsd} Conway credits from USDC`,
+                timestamp: new Date().toISOString(),
+              });
+            } catch { /* non-fatal */ }
           }
           // Stamp cooldown keys so the heartbeat task and agent loop
           // won't immediately retry within seconds of this startup topup.

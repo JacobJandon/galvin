@@ -201,6 +201,16 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
         logger.info(
           `Auto-topup successful: $${result.amountUsd} USD → ${result.creditsCentsAdded} credit cents`,
         );
+        // Record the USDC spent buying credits (honest spend tracking).
+        try {
+          taskCtx.db.insertTransaction({
+            id: `topup_${ulid()}`,
+            type: "credit_purchase",
+            amountCents: Math.round((result.amountUsd ?? 0) * 100),
+            description: `Bought $${result.amountUsd} Conway credits from USDC`,
+            timestamp: new Date().toISOString(),
+          });
+        } catch { /* non-fatal */ }
         return {
           shouldWake: true,
           message: `Auto-topped up $${result.amountUsd} in credits (was $${(credits / 100).toFixed(2)}). USDC remaining: ~$${(balance - result.amountUsd).toFixed(2)}.`,
