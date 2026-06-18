@@ -49,12 +49,15 @@ import {
 } from "./setup/print.js";
 import { startGateway, type GatewayServer } from "./gateway/index.js";
 import { getRunningAgent, removeLock, checkAgentLive, probeGateway } from "./gateway/lock.js";
+import { normalizeArgs } from "./cli/commands.js";
 
 const logger = createLogger("main");
 const VERSION = "0.3.0";
 
 async function main(): Promise<void> {
-  const args = process.argv.slice(2);
+  // Consolidated noun-grouped commands (galvin report debrief, wallet fund, …)
+  // are translated to the canonical flags here; old --flags pass through.
+  const args = normalizeArgs(process.argv.slice(2));
 
   // ─── CLI Commands ────────────────────────────────────────────
 
@@ -69,47 +72,53 @@ async function main(): Promise<void> {
     print(`  ${GR}${DIM}Autonomous AI Agent Runtime · Conway Cloud · USDC Survival${R}`);
     print(`\n  ${B}Usage:${R}`);
     print(`  ${GR}────────────────────────────────────────────────${R}`);
-    const cmd = (name: string, desc: string, pad = 24) =>
+    const cmd = (name: string, desc: string, pad = 30) =>
       print(`  ${G2}galvin ${name.padEnd(pad)}${R}  ${GR}${desc}${R}`);
     print(`\n  ${DIM}Core:${R}`);
-    cmd("--run",          "Start Galvin (setup wizard on first run)");
-    cmd("--chat",         "Chat with Galvin in the terminal");
-    cmd("--doctor",       "Run system health check");
-    cmd("--status",       "Show current agent status");
-    cmd("--version",      "Show version");
-    cmd("--help",         "Show this help");
-    print(`\n  ${DIM}Setup:${R}`);
-    cmd("--setup",        "Re-run the interactive setup wizard");
-    cmd("--configure",    "Edit configuration interactively");
-    cmd("--pick-model",   "Choose the active inference model");
-    cmd("--init",         "Initialize wallet and config directory");
-    cmd("--provision",    "Provision Conway API key (SIWE sign-in)");
-    print(`\n  ${DIM}Inspect:${R}`);
-    cmd("--logs [n]",     "Show last N agent turns (default 10, max 100)");
-    cmd("--watch",        "Live monitor: watch Galvin work in real time (--once for one frame)");
-    cmd("--debrief",      "Full report: spend by model, tools, earnings, errors, log files");
-    cmd("--confirm",      "Tamper-evident hash-chain fingerprint of the agent's history");
-    cmd("--income [days]","Income/expense report (default 30 days)");
-    cmd("--tasks",        "List heartbeat tasks and last run times");
-    cmd("--wallet [sub]", "Wallet: show · backup [path] · export · import <key>");
-    cmd("--fund",         "Show funding QR + wait for USDC deposit (alias: --qr)");
-    cmd("--recover [--execute]", "Find misdirected funds; --execute auto-bridges ETH→Base");
-    cmd("--trust [sub]",  "Trust record · vc (signed credential) · verify <file>");
-    cmd("--owner [sub]",  "Ownership: prove (challenge) · verify <0x-signature>");
-    cmd("--passport [demo]", "AI passport: issue this agent's KYA · demo (full KYO/KYA verify)");
-    cmd("--honeypot <url>", "Check if a GitHub repo/bounty is a honeypot");
-    cmd("--bounties",     "List queued bounty candidates");
-    cmd("--skills [q]",   "Search the skill index (installed + cached marketplace)");
-    cmd("--compute",      "Show + self-test the compute backend (local/ssh/…)");
-    cmd("--notify <msg>", "Broadcast a message across configured channels");
-    cmd("--memory [q]",   "Search semantic memory for a term");
-    cmd("--reset-db",     `${YEL}⚠ Delete DB and start fresh (asks confirmation)${R}`);
+    cmd("run",            "Start Galvin (setup wizard on first run)");
+    cmd("chat",           "Chat with Galvin in the terminal");
+    cmd("watch [--once]", "Live monitor — watch Galvin work in real time");
+    cmd("status",         "Show current agent status");
+    cmd("doctor",         "Run system health check");
+    print(`\n  ${DIM}Setup:${R}  ${GR}galvin setup [configure | model | init | provision | reset-db]${R}`);
+    cmd("setup",          "Re-run the interactive setup wizard");
+    cmd("setup model",    "Choose the active inference model");
+    cmd("setup provision","Provision Conway API key (SIWE sign-in)");
+    print(`\n  ${DIM}Money:${R}  ${GR}galvin wallet [backup | export | import <key> | fund | recover]${R}`);
+    cmd("wallet",         "Show wallet (balance + address)");
+    cmd("wallet fund",    "Show funding QR + wait for USDC deposit");
+    cmd("wallet recover [--execute]", "Recover misdirected funds (bridge→swap, hands-off)");
+    print(`\n  ${DIM}Identity:${R}  ${GR}galvin id [trust | owner | passport]${R}`);
+    cmd("id trust",       "Trust record · vc (signed credential) · verify <file>");
+    cmd("id owner",       "Ownership: prove (challenge) · verify <0x-signature>");
+    cmd("id passport",    "AI passport: issue this agent's KYA · passport demo (full KYO/KYA)");
+    print(`\n  ${DIM}Report:${R}  ${GR}galvin report [logs [n] | debrief | income [days] | tasks | verify | memory]${R}`);
+    cmd("report",         "Full debrief: spend by model, tools, earnings, errors");
+    cmd("report logs [n]","Show last N agent turns (default 10, max 100)");
+    cmd("report verify",  "Tamper-evident hash-chain fingerprint of the history");
+    print(`\n  ${DIM}Lab:${R}  ${GR}galvin lab [bounties | honeypot <url> | skills [q] | compute | notify <msg>]${R}`);
+    cmd("lab",            "List the lab tools (earning + ops experiments)");
+    print(`\n  ${DIM}${G2}galvin version${R}${DIM} · ${G2}galvin help${R}${DIM}   (old --flags still work)${R}`);
     print(`\n  ${DIM}Environment:${R}`);
     print(`  ${GR}CONWAY_API_URL      Conway API (default: https://api.conway.tech)${R}`);
     print(`  ${GR}CONWAY_API_KEY      API key (overrides config)${R}`);
     print(`  ${GR}OLLAMA_BASE_URL     Ollama URL (e.g. http://localhost:11434)${R}`);
     print(`  ${GR}GALVIN_NO_COLOR=1   Disable ANSI colors${R}`);
     print();
+    process.exit(0);
+  }
+
+  // ─── --lab → list the lab tools (the noun's no-verb landing) ──
+  if (args.includes("--lab")) {
+    boxHeader("Lab", "earning + ops experiments");
+    gap();
+    const tool = (name: string, desc: string) => print(`  ${G2}galvin lab ${name.padEnd(20)}${R}  ${GR}${desc}${R}`);
+    tool("bounties", "List queued bounty candidates (earning leads)");
+    tool("honeypot <url>", "Check if a GitHub repo/bounty is a honeypot");
+    tool("skills [q]", "Search the skill index (installed + cached marketplace)");
+    tool("compute", "Show + self-test the compute backend (local/ssh/…)");
+    tool("notify <msg>", "Broadcast a message across configured channels");
+    gap();
     process.exit(0);
   }
 
