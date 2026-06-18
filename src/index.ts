@@ -92,6 +92,7 @@ async function main(): Promise<void> {
     cmd("--tasks",        "List heartbeat tasks and last run times");
     cmd("--wallet [sub]", "Wallet: show · backup [path] · export · import <key>");
     cmd("--fund",         "Show funding QR + wait for USDC deposit (alias: --qr)");
+    cmd("--recover",      "Scan for funds sent to the wrong asset/network + how to recover");
     cmd("--trust [sub]",  "Trust record · vc (signed credential) · verify <file>");
     cmd("--owner [sub]",  "Ownership: prove (challenge) · verify <0x-signature>");
     cmd("--passport [demo]", "AI passport: issue this agent's KYA · demo (full KYO/KYA verify)");
@@ -385,6 +386,7 @@ async function main(): Promise<void> {
       kv("Network",      "Base L2  (mainnet)");
       kv("USDC Balance", `${lowBalance ? RED : G}$${balance.toFixed(4)}${R}${lowBalance ? `  ${YEL}(low — top up to keep Galvin alive)${R}` : ""}`);
       print(`  ${DIM}sub-commands: --wallet backup [path] | export | import <key>${R}`);
+      print(`  ${DIM}sent the wrong asset/network by mistake? → ${B}galvin --recover${R}`);
       gap();
     }
     process.exit(0);
@@ -629,6 +631,38 @@ async function main(): Promise<void> {
     print(JSON.stringify(vc, null, 2));
     print(`\n  ${DIM}This is the agent half. The owner (${ownerAddr ?? "set creatorAddress"}) signs the${R}`);
     print(`  ${DIM}delegation + spend mandate (see --owner prove) — the chain a merchant verifies. See AI_PASSPORT.md.${R}`);
+    process.exit(0);
+  }
+
+  // ─── --recover → scan for misdirected funds (wrong asset/chain) + how to recover ──
+  if (args.includes("--recover")) {
+    const { account } = await getWallet();
+    const { scanWallet, summarize } = await import("./recovery/scanner.js");
+    boxHeader("Fund Recovery", "scanning for funds sent to the wrong asset or network");
+    gap();
+    print(`  ${INFO}  scanning ${account.address} across Base + Ethereum…`);
+    const bals = await scanWallet(account.address);
+    gap();
+    if (bals.length === 0) {
+      print(`  ${DIM}wallet is empty across scanned chains${R}`);
+    }
+    for (const b of bals) {
+      const icon = b.status === "usable" ? `${G}✓${R}` : b.status === "misdirected" ? `${YEL}⚠${R}` : b.amount < 0 ? `${RED}✗${R}` : `${DIM}·${R}`;
+      const amt = b.amount < 0 ? "—" : `${b.amount.toFixed(b.asset === "ETH" ? 6 : 2)} ${b.asset}`;
+      print(`  ${icon}  ${b.chain.padEnd(9)} ${amt.padStart(16)}  ${b.status.padEnd(11)} ${DIM}${b.advice}${R}`);
+    }
+    const s = summarize(bals);
+    gap();
+    if (s.hasMisdirected) {
+      print(`  ${YEL}${B}Misdirected funds found${R} — recover each with the step shown above.`);
+      print(`  ${DIM}Galvin funding needs USDC on Base. Your key (controls the address on every chain) is in${R}`);
+      print(`  ${DIM}~/.galvin/wallet.json — export with: ${B}galvin --wallet export${R}${DIM}, import to a wallet, then bridge/swap.${R}`);
+    } else if (s.usableUsdc >= 5) {
+      print(`  ${G}${B}✓ Funded${R}  ${s.usableUsdc.toFixed(2)} USDC on Base — ready to run.`);
+    } else {
+      print(`  ${DIM}No misdirected funds. Send ≥5 USDC on Base to fund (galvin --fund).${R}`);
+    }
+    gap();
     process.exit(0);
   }
 
