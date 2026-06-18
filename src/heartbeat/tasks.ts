@@ -190,7 +190,10 @@ export const BUILTIN_TASKS: Record<string, HeartbeatTaskFn> = {
 
       taskCtx.db.setKV("last_auto_topup_attempt", new Date().toISOString());
 
-      const { bootstrapTopup } = await import("../conway/topup.js");
+      const { bootstrapTopup, usesConwayCredits } = await import("../conway/topup.js");
+      if (!usesConwayCredits(taskCtx.config)) {
+        return { shouldWake: false }; // direct provider — no Conway credits needed (avoid waste)
+      }
       const result = await bootstrapTopup({
         apiUrl: taskCtx.config.conwayApiUrl,
         account: taskCtx.identity.account,

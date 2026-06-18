@@ -30,6 +30,24 @@ export interface TopupResult {
 }
 
 /**
+ * Conway credits are ONLY needed when inference actually routes to Conway.
+ * If the active model runs on a direct provider (an Anthropic key for a Claude
+ * model, or an OpenAI key for a GPT/o model), buying Conway credits is wasted
+ * money — so don't. (Doctrine §5: never spend on a path that can't be used.)
+ */
+export function usesConwayCredits(config: {
+  inferenceModel?: string;
+  modelStrategy?: { inferenceModel?: string };
+  anthropicApiKey?: string;
+  openaiApiKey?: string;
+}): boolean {
+  const model = config.modelStrategy?.inferenceModel || config.inferenceModel || "";
+  if (/^claude/i.test(model) && config.anthropicApiKey) return false; // Anthropic-direct
+  if (/^(gpt|o[0-9]|chatgpt)/i.test(model) && config.openaiApiKey) return false; // OpenAI-direct
+  return true; // routes to Conway → credits needed
+}
+
+/**
  * Execute a credit topup via x402 payment.
  *
  * Calls GET /pay/{amountUsd}/{address} which returns HTTP 402.

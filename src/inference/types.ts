@@ -208,18 +208,18 @@ export const DEFAULT_ROUTING_MATRIX: RoutingMatrix = {
   // fallbacks (Conway credits endpoint, when its upstream is healthy). If a model
   // is unsupported on the active backend the router fails over to the next one.
   high: {
-    agent_turn: { candidates: ["claude-opus-4-8", "gpt-5.2", "gpt-5-mini"], maxTokens: 8192, ceilingCents: -1 },
+    agent_turn: { candidates: ["claude-opus-4-8", "claude-sonnet-4-6", "gpt-5.2", "gpt-5-mini"], maxTokens: 8192, ceilingCents: -1 },
     heartbeat_triage: { candidates: ["claude-haiku-4-5", "gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
-    safety_check: { candidates: ["claude-opus-4-8", "gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 20 },
+    safety_check: { candidates: ["claude-opus-4-8", "claude-sonnet-4-6", "gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 20 },
     summarization: { candidates: ["claude-sonnet-4-6", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 15 },
-    planning: { candidates: ["claude-opus-4-8", "gpt-5.2", "gpt-5-mini"], maxTokens: 8192, ceilingCents: -1 },
+    planning: { candidates: ["claude-opus-4-8", "claude-sonnet-4-6", "gpt-5.2", "gpt-5-mini"], maxTokens: 8192, ceilingCents: -1 },
   },
   normal: {
-    agent_turn: { candidates: ["claude-opus-4-8", "gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: -1 },
+    agent_turn: { candidates: ["claude-opus-4-8", "claude-sonnet-4-6", "gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: -1 },
     heartbeat_triage: { candidates: ["claude-haiku-4-5", "gpt-5-mini"], maxTokens: 2048, ceilingCents: 5 },
     safety_check: { candidates: ["claude-sonnet-4-6", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 10 },
     summarization: { candidates: ["claude-sonnet-4-6", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 10 },
-    planning: { candidates: ["claude-opus-4-8", "gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: -1 },
+    planning: { candidates: ["claude-opus-4-8", "claude-sonnet-4-6", "gpt-5.2", "gpt-5-mini"], maxTokens: 4096, ceilingCents: -1 },
   },
   low_compute: {
     agent_turn: { candidates: ["claude-haiku-4-5", "gpt-5-mini"], maxTokens: 4096, ceilingCents: 10 },

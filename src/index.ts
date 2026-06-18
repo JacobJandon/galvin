@@ -39,7 +39,7 @@ import type { GalvinIdentity, AgentState, Skill, SocialClientInterface } from ".
 import { DEFAULT_TREASURY_POLICY } from "./types.js";
 import { createLogger, setGlobalLogLevel, StructuredLogger } from "./observability/logger.js";
 import { prettySink } from "./observability/pretty-sink.js";
-import { bootstrapTopup } from "./conway/topup.js";
+import { bootstrapTopup, usesConwayCredits } from "./conway/topup.js";
 import { randomUUID } from "crypto";
 import { keccak256, toHex } from "viem";
 import {
@@ -1595,6 +1595,10 @@ async function run(): Promise<void> {
     try {
       await Promise.race([
         (async () => {
+          if (!usesConwayCredits(config)) {
+            logger.info("Skipping Conway credit topup — active model uses a direct provider (no credits needed; avoids wasted spend).");
+            return;
+          }
           const creditsCents = await conway.getCreditsBalance().catch(() => 0);
           const topupResult = await bootstrapTopup({
             apiUrl: config.conwayApiUrl,

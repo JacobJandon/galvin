@@ -516,12 +516,14 @@ export async function runAgentLoop(
           if (cooldownExpired) {
             db.setKV("last_inline_topup_attempt", new Date().toISOString());
             try {
-              const { bootstrapTopup } = await import("../conway/topup.js");
-              const topupResult = await bootstrapTopup({
-                apiUrl: config.conwayApiUrl,
-                account: identity.account,
-                creditsCents: financial.creditsCents,
-              });
+              const { bootstrapTopup, usesConwayCredits } = await import("../conway/topup.js");
+              const topupResult = usesConwayCredits(config)
+                ? await bootstrapTopup({
+                    apiUrl: config.conwayApiUrl,
+                    account: identity.account,
+                    creditsCents: financial.creditsCents,
+                  })
+                : null; // direct provider — no Conway credits needed (don't waste money)
               if (topupResult?.success) {
                 log(config, `[AUTO-TOPUP] Bought $${topupResult.amountUsd} credits from USDC mid-loop`);
                 // Record the USDC that left the wallet to buy credits (honest spend).
