@@ -86,6 +86,7 @@ async function main(): Promise<void> {
     cmd("--provision",    "Provision Conway API key (SIWE sign-in)");
     print(`\n  ${DIM}Inspect:${R}`);
     cmd("--logs [n]",     "Show last N agent turns (default 10, max 100)");
+    cmd("--debrief",      "Full report: spend by model, tools, earnings, errors, log files");
     cmd("--income [days]","Income/expense report (default 30 days)");
     cmd("--tasks",        "List heartbeat tasks and last run times");
     cmd("--wallet [sub]", "Wallet: show · backup [path] · export · import <key>");
@@ -185,6 +186,57 @@ async function main(): Promise<void> {
         }
       }
     }
+    gap();
+    db.close();
+    process.exit(0);
+  }
+
+  // ─── --debrief → full post-run report: what it did, cost, earned, errors ──
+  if (args.includes("--debrief")) {
+    const config = loadConfig();
+    if (!config) { print(`  ${FAIL}  Not configured.`); process.exit(1); }
+    const db = createDatabase(resolvePath(config.dbPath));
+    const raw = db.raw as unknown as { prepare: (q: string) => { all: () => unknown[]; get: () => unknown } };
+    const usd = (cents: number) => `$${((cents || 0) / 100).toFixed(4)}`;
+    boxHeader("Debrief", "what it did · what it cost · what it earned");
+    gap();
+
+    const inf = raw.prepare("SELECT model, COUNT(*) calls, COALESCE(SUM(input_tokens),0) tin, COALESCE(SUM(output_tokens),0) tout, COALESCE(SUM(cost_cents),0) cents FROM inference_costs GROUP BY model ORDER BY cents DESC").all() as Array<{ model: string; calls: number; tin: number; tout: number; cents: number }>;
+    const infTotal = inf.reduce((s, r) => s + r.cents, 0);
+    print(`  ${B}Inference spend${R}  ${usd(infTotal)}`);
+    if (inf.length === 0) print(`    ${DIM}no inference calls recorded yet${R}`);
+    for (const r of inf) print(`    ${String(r.model).padEnd(18)} ${String(r.calls).padStart(4)} calls  ${String(r.tin + r.tout).padStart(8)} tok  ${usd(r.cents)}`);
+    gap();
+
+    const tx = raw.prepare("SELECT type, COUNT(*) n, COALESCE(SUM(amount_cents),0) cents FROM transactions GROUP BY type ORDER BY cents DESC").all() as Array<{ type: string; n: number; cents: number }>;
+    print(`  ${B}Transactions${R}  ${DIM}(transfer_in = earned)${R}`);
+    if (tx.length === 0) print(`    ${DIM}none${R}`);
+    for (const r of tx) print(`    ${String(r.type).padEnd(18)} ${String(r.n).padStart(4)}×  ${usd(r.cents)}`);
+    gap();
+
+    const tools = raw.prepare("SELECT name, COUNT(*) n, SUM(CASE WHEN error IS NOT NULL AND error != '' THEN 1 ELSE 0 END) errs FROM tool_calls GROUP BY name ORDER BY n DESC").all() as Array<{ name: string; n: number; errs: number }>;
+    print(`  ${B}Tools used${R}`);
+    if (tools.length === 0) print(`    ${DIM}none${R}`);
+    for (const r of tools) print(`    ${String(r.name).padEnd(22)} ${String(r.n).padStart(4)}×  ${r.errs > 0 ? `${RED}${r.errs} err${R}` : `${G}ok${R}`}`);
+    gap();
+
+    const turnCount = (raw.prepare("SELECT COUNT(*) c FROM turns").get() as { c: number }).c;
+    print(`  ${B}Activity${R}  ${turnCount} turns`);
+    const recent = raw.prepare("SELECT timestamp, thinking FROM turns ORDER BY created_at DESC LIMIT 3").all() as Array<{ timestamp: string; thinking: string }>;
+    for (const t of recent) {
+      const think = String(t.thinking || "").replace(/\s+/g, " ").slice(0, 90);
+      print(`    ${DIM}${new Date(t.timestamp).toLocaleString()}  ${think}${think.length >= 90 ? "…" : ""}${R}`);
+    }
+    gap();
+
+    try {
+      const logDir = path.join(getGalvinDir(), "logs");
+      const fileList = fs.existsSync(logDir) ? fs.readdirSync(logDir).filter((f) => f.endsWith(".jsonl")).sort().slice(-3) : [];
+      if (fileList.length) {
+        print(`  ${B}Full logs (flight recorder)${R}`);
+        for (const f of fileList) print(`    ${DIM}${path.join(logDir, f)}${R}`);
+      }
+    } catch { /* ignore */ }
     gap();
     db.close();
     process.exit(0);
@@ -644,7 +696,18 @@ async function main(): Promise<void> {
       );
       process.exit(1);
     });
-    StructuredLogger.setSink(prettySink);
+    // Flight recorder: tee every structured log line to a durable JSONL file, so a
+    // funded run is never a black box — full record on disk even when detached.
+    const frRunId = new Date().toISOString().replace(/[:.]/g, "-");
+    const frDir = path.join(getGalvinDir(), "logs");
+    fs.mkdirSync(frDir, { recursive: true });
+    const frFile = path.join(frDir, `run-${frRunId}.jsonl`);
+    const frStream = fs.createWriteStream(frFile, { flags: "a", mode: 0o600 });
+    StructuredLogger.setSink((entry) => {
+      prettySink(entry);
+      try { frStream.write(JSON.stringify(entry) + "\n"); } catch { /* best effort */ }
+    });
+    print(`  ${DIM}flight recorder → ${frFile}${R}  (full log; review with galvin --debrief)`);
     await run();
     return;
   }
