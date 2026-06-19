@@ -553,9 +553,17 @@ export function createBuiltinTools(sandboxId: string, workspace?: string): Galvi
         required: ["amount_usd"],
       },
       execute: async (args, ctx) => {
-        const { topupCredits, TOPUP_TIERS } =
+        const { topupCredits, TOPUP_TIERS, usesConwayCredits } =
           await import("../conway/topup.js");
         const amountUsd = args.amount_usd as number;
+
+        // Wallet protection (doctrine §5): if inference runs on a direct provider
+        // (Anthropic/OpenAI key), Conway credits are NOT needed for thinking — and
+        // Conway's compute upstream is unreliable here. Refuse to drain real USDC
+        // on credits that can't be used. (This tool previously drained $5.)
+        if (!usesConwayCredits(ctx.config)) {
+          return "Refused: you run inference on a direct provider, so Conway credits are not needed for thinking, and Conway compute is unreliable here. Do NOT spend USDC on Conway credits — keep the wallet for real earning. Run any service locally (start_x402_server runs in-process; use expose_port) instead of a Conway sandbox.";
+        }
 
         if (!TOPUP_TIERS.includes(amountUsd)) {
           return `Invalid tier. Valid amounts (USD): ${TOPUP_TIERS.join(", ")}`;

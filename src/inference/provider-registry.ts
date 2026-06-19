@@ -54,17 +54,21 @@ interface ProviderConfigFile {
 const DEFAULT_EMERGENCY_STOP_CREDITS = 100;
 
 const DEFAULT_TIER_DEFAULTS: Record<ModelTier, TierDefault> = {
+  // Anthropic is preferred for every tier — it's the provider that actually has a
+  // working key here (Opus for reasoning, Haiku for cheap/fast). The others are kept
+  // as fallbacks for setups that configure their keys. (Without this the orchestrator
+  // routed to groq/openai/together, all of which 401/429 here, and goal-planning died.)
   reasoning: {
-    preferredProvider: "openai",
-    fallbackOrder: ["groq", "together"],
+    preferredProvider: "anthropic",
+    fallbackOrder: ["openai", "groq", "together"],
   },
   fast: {
-    preferredProvider: "groq",
-    fallbackOrder: ["openai", "together", "local"],
+    preferredProvider: "anthropic",
+    fallbackOrder: ["groq", "openai", "together", "local"],
   },
   cheap: {
-    preferredProvider: "groq",
-    fallbackOrder: ["together", "local", "openai"],
+    preferredProvider: "anthropic",
+    fallbackOrder: ["groq", "together", "local", "openai"],
   },
 };
 
