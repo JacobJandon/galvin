@@ -368,7 +368,7 @@ async function chatViaAnthropic(params: {
   };
 }
 
-function transformMessagesForAnthropic(
+export function transformMessagesForAnthropic(
   messages: ChatMessage[],
 ): { system?: string; messages: Array<Record<string, unknown>> } {
   const systemParts: string[] = [];
@@ -448,8 +448,74 @@ function transformMessagesForAnthropic(
 
   return {
     system: systemParts.length > 0 ? systemParts.join("\n\n") : undefined,
-    messages: transformed,
+    messages: normalizeAnthropicMessages(transformed),
   };
+}
+
+type AMsg = Record<string, unknown>;
+function aBlocks(m: AMsg): Array<Record<string, unknown>> {
+  return Array.isArray(m.content) ? (m.content as Array<Record<string, unknown>>) : [];
+}
+
+/**
+ * Make a transformed message array satisfy Anthropic's strict structural rules
+ * (it is far stricter than OpenAI/Conway):
+ *  1. every `tool_use` must be immediately followed by a user `tool_result` for the
+ *     SAME id — inject synthetic results for orphans (e.g. context trimming dropped them);
+ *  2. drop `tool_result` blocks with no matching preceding `tool_use`;
+ *  3. the first message must be a user message;
+ *  4. the conversation must END with a user message (a trailing assistant turn is a
+ *     "prefill", which Opus rejects: 400 invalid_request_error).
+ */
+export function normalizeAnthropicMessages(msgs: AMsg[]): AMsg[] {
+  const out: AMsg[] = [];
+  for (let i = 0; i < msgs.length; i++) {
+    const m = msgs[i]!;
+    if (m.role === "user" && aBlocks(m).some((b) => b.type === "tool_result")) {
+      // keep only tool_results matching the immediately-preceding assistant's tool_use ids
+      const prev = out[out.length - 1];
+      const validIds = new Set(
+        prev && prev.role === "assistant"
+          ? aBlocks(prev).filter((b) => b.type === "tool_use").map((b) => b.id as string)
+          : [],
+      );
+      const kept = aBlocks(m).filter((b) => b.type !== "tool_result" || validIds.has(b.tool_use_id as string));
+      if (kept.length === 0) continue; // was only orphaned tool_results — drop the message
+      out.push({ role: "user", content: kept });
+      continue;
+    }
+    out.push(m);
+    if (m.role === "assistant") {
+      const ids = aBlocks(m).filter((b) => b.type === "tool_use").map((b) => b.id as string);
+      if (ids.length > 0) {
+        const next = msgs[i + 1];
+        const provided = new Set(
+          next && next.role === "user"
+            ? aBlocks(next).filter((b) => b.type === "tool_result").map((b) => b.tool_use_id as string)
+            : [],
+        );
+        const missing = ids.filter((id) => !provided.has(id));
+        if (missing.length > 0) {
+          const blocks = missing.map((id) => ({
+            type: "tool_result",
+            tool_use_id: id,
+            content: "[tool result unavailable — context trimmed]",
+          }));
+          if (next && next.role === "user" && Array.isArray(next.content)) {
+            next.content = [...blocks, ...(next.content as unknown[])]; // merged when pushed next iter
+          } else {
+            out.push({ role: "user", content: blocks });
+          }
+        }
+      }
+    }
+  }
+  // first message must be user
+  while (out.length > 0 && out[0]!.role !== "user") out.shift();
+  // conversation must end with a user message
+  const tail = out[out.length - 1];
+  if (tail && tail.role === "assistant") out.push({ role: "user", content: "Continue." });
+  return out;
 }
 
 function parseToolArguments(raw: string): Record<string, unknown> {
