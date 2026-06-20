@@ -109,6 +109,31 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // ─── --earn → run the positive-margin safety-check revenue service (local) ──
+  if (args.includes("--earn")) {
+    const config = loadConfig();
+    if (!config) { print(`  ${FAIL}  Not configured.`); process.exit(1); }
+    const { account } = await getWallet();
+    const db = createDatabase(resolvePath(config.dbPath));
+    const { createSafetyService } = await import("./earning/safety-service.js");
+    const portArg = parseInt(args[args.indexOf("--earn") + 1] || "", 10);
+    const port = Number.isFinite(portArg) ? portArg : 8402;
+    const identity = { address: account.address, name: config.name, account, sandboxId: config.sandboxId } as unknown as GalvinIdentity;
+    const server = createSafetyService(identity, config, db, { port, priceCents: 2 });
+    await server.start();
+    boxHeader("Solvatron Safety Check — LIVE", "positive-margin x402 service · paid into your wallet");
+    gap();
+    print(`  ${G}${B}● serving${R}  http://127.0.0.1:${port}/?target=<github repo/bounty url>`);
+    print(`  ${B}price${R}     $0.02 / check   ${DIM}(serving cost ≈ $0 — almost pure margin)${R}`);
+    print(`  ${B}pays to${R}   ${account.address}  ${DIM}(on Base, USDC, x402)${R}`);
+    print(`  ${DIM}Unpaid requests get HTTP 402 + a payment descriptor; paid ones run a real check.${R}`);
+    print(`  ${DIM}Expose publicly (tunnel / expose_port) to take real traffic. Ctrl-C to stop.${R}`);
+    gap();
+    const stop = () => { try { server.stop(); db.close(); } catch { /* */ } process.exit(0); };
+    process.on("SIGINT", stop); process.on("SIGTERM", stop);
+    return; // stay alive serving
+  }
+
   // ─── --lab → list the lab tools (the noun's no-verb landing) ──
   if (args.includes("--lab")) {
     boxHeader("Lab", "earning + ops experiments");

@@ -3537,6 +3537,10 @@ Model: ${ctx.inference.getDefaultModel()}
             type: "string",
             description: "Skill ID to attribute income to in the economic memory optimizer. Use query_skill_income to see earnings per skill.",
           },
+          service: {
+            type: "string",
+            description: "Built-in service to serve. Set to 'safety' to run the positive-margin scam/honeypot checker (runs a REAL check per paid request, serving cost ≈ $0 — this is the recommended earner). Omit for a static response_body.",
+          },
         },
         required: ["description"],
       },
@@ -3555,6 +3559,15 @@ Model: ${ctx.inference.getDefaultModel()}
           await existing.stop();
         }
 
+        // Built-in positive-margin service: the safety/scam checker. Runs a REAL
+        // check per paid request (serving cost ≈ $0) — prefer this over a static
+        // body when you want something buyers actually want.
+        let handler: ((req: { url: string; method: string }) => Promise<{ body: string; contentType?: string }>) | undefined;
+        if (args.service === "safety" || args.skill_id === "safety-check") {
+          const { safetyHandler } = await import("../earning/safety-service.js");
+          handler = safetyHandler();
+        }
+
         const server = createX402Server(ctx.identity, ctx.config, ctx.db, {
           description: args.description as string,
           port,
@@ -3563,6 +3576,7 @@ Model: ${ctx.inference.getDefaultModel()}
           responseBody: args.response_body as string | undefined,
           responseContentType: args.response_content_type as string | undefined,
           skillId: args.skill_id as string | undefined,
+          handler,
         });
 
         try {

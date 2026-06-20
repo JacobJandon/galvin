@@ -46,6 +46,13 @@ export interface X402ServerOptions {
   responseBody?: string;
   /** Content-Type headerfor the response body. Default: application/json */
   responseContentType?: string;
+  /**
+   * Dynamic handler: runs AFTER payment is verified to produce the response for
+   * THIS request (e.g. run a real safety check on the requested target). When set,
+   * its output replaces responseBody. This is what turns the x402 server into a
+   * real, positive-margin paid API (cheap to serve, charged per call).
+   */
+  handler?: (req: { url: string; method: string }) => Promise<{ body: string; contentType?: string }>;
 }
 
 export interface X402ServerStats {
@@ -335,14 +342,26 @@ export function createX402Server(
       `x402 payment verified [${requestId}]: $${priceUsdc.toFixed(4)} USDC from ${(verification.proof?.from ?? "?").slice(0, 10)}...`,
     );
 
-    // Deliver the paid response
+    // Deliver the paid response — run the dynamic handler if provided, else static.
+    let outBody = responseBody;
+    let outType = responseContentType;
+    if (options.handler) {
+      try {
+        const r = await options.handler({ url: req.url ?? "/", method: req.method ?? "GET" });
+        outBody = r.body;
+        if (r.contentType) outType = r.contentType;
+      } catch (e: any) {
+        outBody = JSON.stringify({ error: "service error", detail: e?.message ?? String(e) });
+        outType = "application/json";
+      }
+    }
     res.writeHead(200, {
-      "Content-Type": responseContentType,
-      "Content-Length": Buffer.byteLength(responseBody),
+      "Content-Type": outType,
+      "Content-Length": Buffer.byteLength(outBody),
       "X-Request-Id": requestId,
       "X-Payment-Verified": "true",
     });
-    res.end(responseBody);
+    res.end(outBody);
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────

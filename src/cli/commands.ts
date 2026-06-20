@@ -50,6 +50,7 @@ export const GROUPS: Record<string, Group> = {
     base: "--debrief",
     verbs: { logs: "--logs", debrief: "--debrief", income: "--income", tasks: "--tasks", verify: "--confirm", memory: "--memory" },
   },
+  earn: { base: "--earn", verbs: {} },
   lab: {
     base: "--lab",
     verbs: { bounties: "--bounties", honeypot: "--honeypot", skills: "--skills", compute: "--compute", notify: "--notify" },
