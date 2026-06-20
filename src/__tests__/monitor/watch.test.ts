@@ -1,5 +1,46 @@
 import { describe, it, expect } from "vitest";
-import { parseTailLines, renderEntry, shortContext, shortTime, collectStats, isActive, type RawDb } from "../../monitor/watch.js";
+import { parseTailLines, renderEntry, shortContext, shortTime, collectStats, collectServices, isActive, type RawDb } from "../../monitor/watch.js";
+
+describe("collectServices — services Solvatron built", () => {
+  const fakeDb = (kvRows: unknown[], incomeRows: unknown[]): RawDb => ({
+    prepare(q: string) {
+      return {
+        all: () => (q.includes("FROM kv") ? kvRows : q.includes("skill_income_log") ? incomeRows : []),
+        get: () => undefined,
+      };
+    },
+  });
+
+  it("lists running x402 services with their stats + lifetime earnings", () => {
+    const db = fakeDb(
+      [{ key: "x402svc:8402", value: JSON.stringify({ skillId: "safety-check", description: "scam checker", port: 8402, priceCents: 2, served: 3, earnedCents: 6, running: true }) }],
+      [{ skill_id: "safety-check", total: 0.06 }],
+    );
+    const s = collectServices(db);
+    expect(s).toHaveLength(1);
+    expect(s[0]!.skillId).toBe("safety-check");
+    expect(s[0]!.running).toBe(true);
+    expect(s[0]!.served).toBe(3);
+    expect(s[0]!.earnedCents).toBe(6);
+    expect(s[0]!.earnedUsdcTotal).toBeCloseTo(0.06);
+  });
+
+  it("returns empty when nothing built yet, and survives malformed rows", () => {
+    expect(collectServices(fakeDb([], []))).toEqual([]);
+    expect(collectServices(fakeDb([{ key: "x402svc:1", value: "not json" }], []))).toEqual([]);
+  });
+
+  it("sorts running services first", () => {
+    const db = fakeDb(
+      [
+        { key: "x402svc:1", value: JSON.stringify({ skillId: "stopped-svc", port: 1, priceCents: 1, running: false, earnedCents: 0 }) },
+        { key: "x402svc:2", value: JSON.stringify({ skillId: "live-svc", port: 2, priceCents: 1, running: true, earnedCents: 0 }) },
+      ],
+      [],
+    );
+    expect(collectServices(db)[0]!.skillId).toBe("live-svc");
+  });
+});
 
 describe("parseTailLines — tolerant JSONL tail", () => {
   it("parses valid lines, skips a partially-written final line, keeps the last N", () => {

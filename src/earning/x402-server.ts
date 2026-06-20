@@ -128,6 +128,29 @@ export function createX402Server(
   let server: http.Server | null = null;
   let running = false;
 
+  // Persist this service to the kv store so `galvin watch` can show what Solvatron
+  // built and how it's earning — even across processes.
+  const persistService = () => {
+    try {
+      (db.raw as unknown as { prepare: (q: string) => { run: (...a: unknown[]) => void } })
+        .prepare("INSERT INTO kv (key,value,updated_at) VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at")
+        .run(
+          `x402svc:${port}`,
+          JSON.stringify({
+            skillId: options.skillId ?? "x402",
+            description: options.description,
+            port,
+            priceCents,
+            startedAt,
+            served: requestsServed,
+            earnedCents: earningsCents,
+            running,
+          }),
+          new Date().toISOString(),
+        );
+    } catch { /* best effort */ }
+  };
+
   // ─── Payment Requirement Descriptor ─────────────────────────────────────
 
   function paymentRequiredBody(requestId: string): string {
@@ -318,6 +341,7 @@ export function createX402Server(
     // Payment verified — record income
     requestsServed++;
     earningsCents += priceCents;
+    persistService();
 
     // Economic memory: record income attributed to the skill
     try {
@@ -386,6 +410,7 @@ export function createX402Server(
 
         server.listen(port, "0.0.0.0", () => {
           running = true;
+          persistService();
           logger.info(
             `x402 server started on port ${port} | price=$${priceUsdc.toFixed(4)} USDC | "${description}"`,
           );
@@ -407,6 +432,7 @@ export function createX402Server(
         }
         server.close(() => {
           running = false;
+          persistService();
           logger.info(
             `x402 server stopped | served=${requestsServed} requests | earned=$${(earningsCents / 100).toFixed(2)}`,
           );

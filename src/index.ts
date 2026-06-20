@@ -284,7 +284,7 @@ async function main(): Promise<void> {
   if (args.includes("--watch") || args.includes("--live") || args.includes("--monitor")) {
     const config = loadConfig();
     if (!config) { print(`  ${FAIL}  Not configured.`); process.exit(1); }
-    const { collectStats, parseTailLines, renderEntry, isActive } = await import("./monitor/watch.js");
+    const { collectStats, collectServices, parseTailLines, renderEntry, isActive } = await import("./monitor/watch.js");
     type RawDb = import("./monitor/watch.js").RawDb;
     const noColor = !!process.env.GALVIN_NO_COLOR;
     const db = createDatabase(resolvePath(config.dbPath));
@@ -347,6 +347,21 @@ async function main(): Promise<void> {
         }
       } else {
         out.push(`  ${DIM}ledger not ready yet${R}`);
+      }
+      // ── Services Solvatron built (the earning side) ──
+      out.push(`  ${GR}${"─".repeat(74)}${R}`);
+      let svcs: ReturnType<typeof collectServices> = [];
+      try { svcs = collectServices(raw); } catch { /* */ }
+      const svcEarned = svcs.reduce((a, x) => a + x.earnedCents, 0);
+      out.push(`  ${B}Services built${R}  ${DIM}(what Solvatron stood up to earn)${R}   ${svcEarned > 0 ? `${G}earned ${usd(svcEarned)}${R}` : ""}`);
+      if (svcs.length === 0) {
+        out.push(`    ${DIM}none yet — Solvatron registers each x402 service here when it starts one${R}`);
+      } else {
+        for (const sv of svcs.slice(0, 6)) {
+          const dot = sv.running ? `${G}●${R}` : `${DIM}○${R}`;
+          out.push(`  ${dot} ${B}${sv.skillId.padEnd(16)}${R}${DIM}:${sv.port}${R}  ${DIM}$${(sv.priceCents / 100).toFixed(2)}/call${R}  served ${sv.served}  ${sv.earnedCents > 0 ? G : DIM}earned ${usd(sv.earnedCents)}${R}`);
+          if (sv.description) out.push(`    ${DIM}${sv.description.slice(0, 70)}${R}`);
+        }
       }
       out.push(`  ${GR}${"─".repeat(74)}${R}`);
       out.push(`  ${B}Live feed${R}  ${DIM}${file ? path.basename(file) : "waiting for a run — start one with: galvin --run"}${R}`);

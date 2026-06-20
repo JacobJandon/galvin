@@ -146,3 +146,48 @@ export function collectStats(db: RawDb): LiveStats {
 export function isActive(mtimeMs: number, now: number, staleMs = 15_000): boolean {
   return now - mtimeMs < staleMs;
 }
+
+// ─── Services Solvatron built (the earning side) ─────────────────────────────
+
+export interface ServiceInfo {
+  skillId: string;
+  description?: string;
+  port: number;
+  priceCents: number;
+  served: number;
+  earnedCents: number;
+  running: boolean;
+  earnedUsdcTotal: number; // lifetime, from skill_income_log
+}
+
+/** Roll up the x402 services Solvatron has stood up (from the kv registry) and
+ *  their lifetime earnings (from skill_income_log). Pure given a RawDb. */
+export function collectServices(db: RawDb): ServiceInfo[] {
+  const income: Record<string, number> = {};
+  try {
+    const inc = db.prepare("SELECT skill_id, COALESCE(SUM(usdc),0) total FROM skill_income_log GROUP BY skill_id").all() as { skill_id: string; total: number }[];
+    for (const r of inc) income[r.skill_id] = r.total;
+  } catch { /* table may be absent */ }
+
+  const out: ServiceInfo[] = [];
+  let rows: { key: string; value: string }[] = [];
+  try {
+    rows = db.prepare("SELECT key, value FROM kv WHERE key LIKE 'x402svc:%'").all() as { key: string; value: string }[];
+  } catch { /* */ }
+  for (const r of rows) {
+    try {
+      const s = JSON.parse(r.value) as Partial<ServiceInfo> & { skillId: string };
+      out.push({
+        skillId: s.skillId,
+        description: s.description,
+        port: Number(s.port ?? 0),
+        priceCents: Number(s.priceCents ?? 0),
+        served: Number(s.served ?? 0),
+        earnedCents: Number(s.earnedCents ?? 0),
+        running: !!s.running,
+        earnedUsdcTotal: income[s.skillId] ?? 0,
+      });
+    } catch { /* skip malformed */ }
+  }
+  return out.sort((a, b) => Number(b.running) - Number(a.running) || b.earnedCents - a.earnedCents);
+}
