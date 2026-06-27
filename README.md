@@ -181,4 +181,7 @@ All agent intelligence, memory, inference routing, orchestration, and self-modif
 
 ## License
 
-MIT
+**MIT** — see [`LICENSE`](./LICENSE). Galvin is a derivative work, forked from and built on
+[`Conway-Research/automaton`](https://github.com/Conway-Research/automaton) (also MIT); the upstream portions
+remain copyright Conway-Research, and Galvin's additions are copyright the Solvatron / Galvin project. You are
+free to use, modify, and redistribute under the MIT terms — just keep the copyright and permission notice.

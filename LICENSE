@@ -1,6 +1,13 @@
 MIT License
 
-Copyright (c) 2026 Conway
+Copyright (c) 2026 Solvatron — the Galvin project
+Portions Copyright (c) 2026 Conway-Research
+
+Galvin is a derivative work, built on and forked from automaton
+(https://github.com/Conway-Research/automaton), the open-source sovereign-agent
+runtime. The upstream portions remain copyright their original authors
+(Conway-Research); Galvin's additions are copyright the Solvatron / Galvin
+project. The whole work is distributed under the MIT License below.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

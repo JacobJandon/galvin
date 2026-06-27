@@ -1,7 +1,7 @@
 # Galvin — A Solvatron: Architecture & Usage
 
 > The single reference for what Galvin is, how to run it, and how it works inside.
-> Concept & economy: [`../SOLVATRON.md`](../SOLVATRON.md). Strategy: [`../WEB4_GODFATHER_PLAN.md`](../WEB4_GODFATHER_PLAN.md).
+> Concept & economy: [`../SOLVATRON.md`](../../SOLVATRON.md). Strategy: [`../WEB4_GODFATHER_PLAN.md`](../../WEB4_GODFATHER_PLAN.md).
 > The earlier verbose `ARCHITECTURE.md` / `DESIGN.md` / `DOCUMENTATION.md` are archived under `_archive/galvin-docs/`.
 
 ---
